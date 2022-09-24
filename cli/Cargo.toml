@@ -1,0 +1,14 @@
+[package]
+name = "spacedisplay-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spacedisplay-lib = { path = "../lib" }
+
+anyhow = "1.0"
+byte-unit = { version = "4.0", default-features = false, features = ["std"] }
+clap = { version = "4.0.0-rc.2", features = ["derive"] }
+crossterm = { version = "0.25", features = ["serde"] }
+tui = { version = "0.19", default-features = false, features = ["crossterm"] }
+unicode-width = "0.1.10"

@@ -1,0 +1,12 @@
+[package]
+name = "spacedisplay-lib"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+byte-unit = { version = "4.0", default-features = false, features = ["std"] }
+crc = "3.0.0"
+ptree = "0.4.0"
+
+[target.'cfg(unix)'.dependencies]
+proc-mounts = "0.3.0"

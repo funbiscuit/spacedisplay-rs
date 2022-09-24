@@ -1,3 +1,5 @@
 # spacedisplay-rs
 
-[//]: # (todo)
+Simple terminal app to scan your disk space
+
+![demo](images/sample.png)
