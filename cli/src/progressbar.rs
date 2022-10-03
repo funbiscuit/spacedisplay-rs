@@ -14,15 +14,9 @@ pub struct BarItem {
     pub min_ratio: Option<f64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct ProgressBar {
     parts: Vec<BarItem>,
-}
-
-impl Default for ProgressBar {
-    fn default() -> ProgressBar {
-        ProgressBar { parts: vec![] }
-    }
 }
 
 impl ProgressBar {

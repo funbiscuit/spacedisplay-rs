@@ -68,9 +68,8 @@ impl App {
     }
 
     pub fn on_fn(&mut self, n: u8) {
-        match n {
-            1 => self.screen = Screen::Help,
-            _ => {}
+        if n == 1 {
+            self.screen = Screen::Help;
         }
     }
 

@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use crc::CRC_16_ISO_IEC_14443_3_A;
@@ -89,11 +90,12 @@ impl EntryPath {
     pub fn parts(&self) -> &[String] {
         &self.parts
     }
+}
 
-    /// Return String representation of this path
-    pub fn to_string(&self) -> String {
+impl Display for EntryPath {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         // only Strings are stored, so this should not fail
-        self.get_path().to_str().unwrap().to_string()
+        write!(f, "{}", self.get_path().to_str().unwrap())
     }
 }
 
@@ -134,7 +136,7 @@ impl PartialOrd for EntryPath {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::tree::path::{EntryPath, CRC_BUILDER};
+    use crate::path::{EntryPath, CRC_BUILDER};
 
     fn path<T: Into<PathBuf>>(name: T) -> PathBuf {
         name.into()

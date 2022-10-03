@@ -147,8 +147,6 @@ impl<'a> StatefulWidget for FileList<'a> {
         // space between name and size bar, size bar and size str, size str and border
         let spaces = 3;
 
-        let mut current_height = 0;
-
         let total_size: u64 = self.items.iter().map(|f| f.size.get_bytes()).sum();
 
         for (i, item) in self
@@ -158,8 +156,7 @@ impl<'a> StatefulWidget for FileList<'a> {
             .skip(state.offset)
             .take(end - start)
         {
-            let (x, y) = (list_area.left(), list_area.top() + current_height);
-            current_height += 1;
+            let (x, y) = (list_area.left(), list_area.top() + i as u16);
             let area = Rect {
                 x,
                 y,

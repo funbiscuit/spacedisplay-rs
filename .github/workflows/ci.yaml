@@ -1,0 +1,60 @@
+name: Build
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+  release:
+    types: [ published ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+      - name: Check and Test
+        run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: spacedisplay-amd64_linux
+          path: ${{github.workspace}}/target/release/spacedisplay-cli
+
+  build-win:
+    runs-on: windows-2019
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+      - name: Check and Test
+        run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: spacedisplay-win64.exe
+          path: ${{github.workspace}}/target/release/spacedisplay-cli.exe

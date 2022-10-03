@@ -4,7 +4,7 @@ use std::num::NonZeroU32;
 pub struct Id(NonZeroU32);
 
 impl Id {
-    fn id(index: usize) -> Self {
+    fn from_index(index: usize) -> Self {
         Id(NonZeroU32::new((index + 1) as u32).unwrap())
     }
 
@@ -45,7 +45,7 @@ impl<T> Arena<T> {
             id
         } else {
             self.items.push(Some(item));
-            Id::id(self.items.len() - 1)
+            Id::from_index(self.items.len() - 1)
         }
     }
 
@@ -58,7 +58,7 @@ impl<T> Arena<T> {
             self.items[id.index()] = Some(supplier(id));
             id
         } else {
-            let id = Id::id(self.items.len());
+            let id = Id::from_index(self.items.len());
             self.items.push(Some(supplier(id)));
             id
         }
@@ -100,7 +100,7 @@ impl<T> Default for Arena<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tree::arena::Arena;
+    use crate::arena::Arena;
 
     #[test]
     fn put_and_remove() {

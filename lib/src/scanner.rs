@@ -5,8 +5,8 @@ use std::thread::JoinHandle;
 
 use byte_unit::Byte;
 
-use crate::tree::entry::FileEntry;
-use crate::tree::tree::FileTree;
+use crate::entry::FileEntry;
+use crate::tree::FileTree;
 use crate::{utils, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
 #[derive(Clone, Debug)]
@@ -111,9 +111,9 @@ impl Scanner {
 
             while scan_flag.load(Ordering::SeqCst) {
                 if let Some(s) = queue.pop() {
-                    let entries = std::fs::read_dir(&s.get_path())
+                    let entries: Vec<_> = std::fs::read_dir(&s.get_path())
                         .and_then(|dir| dir.collect::<Result<_, _>>())
-                        .unwrap_or(vec![]);
+                        .unwrap_or_default();
 
                     for entry in entries {
                         let name = entry.file_name().to_str().unwrap().to_string();

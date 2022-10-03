@@ -85,7 +85,7 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
         )
         .unwrap();
     let files: Vec<_> = tree.get_root().iter().collect();
-    if app.file_list_state.selected() >= files.len() && files.len() > 0 {
+    if app.file_list_state.selected() >= files.len() && !files.is_empty() {
         app.file_list_state.select(files.len() - 1);
     }
 

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use byte_unit::Byte;
 
-use crate::tree::arena::{Arena, Id};
+use crate::arena::{Arena, Id};
 
 #[derive(Debug)]
 pub struct EntrySnapshot {

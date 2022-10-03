@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use byte_unit::Byte;
 
-use crate::tree::arena::{Arena, Id};
-use crate::tree::entry::FileEntry;
-use crate::tree::path::{EntryPath, PathCrc};
+use crate::arena::{Arena, Id};
+use crate::entry::FileEntry;
+use crate::path::{EntryPath, PathCrc};
 use crate::{EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
 #[derive(Clone, Debug)]
@@ -37,7 +37,7 @@ impl FileTree {
     /// Path must be an existing directory in this tree
     pub fn add_child(&mut self, path: &EntryPath, child: FileEntry) -> Option<Id> {
         //todo use Result as return
-        let parent_id = self.find_entry(&path)?;
+        let parent_id = self.find_entry(path)?;
         let child_id = self.arena.put(child);
 
         FileEntry::add_child(&mut self.arena, parent_id, child_id);
@@ -138,9 +138,9 @@ impl FileTree {
 mod tests {
     use std::path::PathBuf;
 
-    use crate::tree::entry::FileEntry;
-    use crate::tree::path::EntryPath;
-    use crate::tree::tree::FileTree;
+    use crate::entry::FileEntry;
+    use crate::path::EntryPath;
+    use crate::tree::FileTree;
     use crate::SnapshotConfig;
 
     fn new_dir<T: Into<String>>(name: T) -> FileEntry {

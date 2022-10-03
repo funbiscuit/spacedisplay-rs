@@ -22,7 +22,7 @@ pub fn get_excluded_paths() -> Vec<PathBuf> {
     // collect only non overlapping mounts so we have less items
     // for example /dev/sda will not be added because /dev already skips /dev/sda
     for mount in mounts {
-        if excluded.iter().find(|p| mount.starts_with(p)).is_none() {
+        if !excluded.iter().any(|p| mount.starts_with(p)) {
             excluded.push(mount);
         }
     }

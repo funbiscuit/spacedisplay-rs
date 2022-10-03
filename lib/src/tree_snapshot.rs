@@ -1,6 +1,6 @@
-use crate::tree::arena::{Arena, Id};
-use crate::tree::entry::FileEntry;
-use crate::tree::entry_snapshot::EntrySnapshotRef;
+use crate::arena::{Arena, Id};
+use crate::entry::FileEntry;
+use crate::entry_snapshot::EntrySnapshotRef;
 use crate::EntrySnapshot;
 
 #[derive(Clone, Debug)]
@@ -81,9 +81,9 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
         entry: &FileEntry,
         arena: &Arena<FileEntry>,
         config: SnapshotConfig,
-        wrapper: &Box<dyn Fn(EntrySnapshot) -> W>,
+        wrapper: &dyn Fn(EntrySnapshot) -> W,
     ) {
-        if config.max_depth <= 0 {
+        if config.max_depth == 0 {
             self.arena.get_mut(id).as_mut().set_children(vec![]);
             return;
         }

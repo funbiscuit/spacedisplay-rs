@@ -3,8 +3,8 @@ use std::fmt::Debug;
 
 use ptree::TreeBuilder;
 
-use crate::tree::arena::{Arena, Id};
-use crate::tree::path::{EntryPath, PathCrc};
+use crate::arena::{Arena, Id};
+use crate::path::{EntryPath, PathCrc};
 
 /// Represents a file (or dir) in a file tree
 ///
@@ -209,10 +209,10 @@ impl FileEntry {
             let new = FileEntry::find_child(children, arena, &child.name, new_size).unwrap_err();
 
             let children = arena.get_mut(entry_id).children.as_mut().unwrap();
-            if prev < new {
-                children[prev..=new].rotate_left(1);
-            } else if prev > new {
-                children[new..=prev].rotate_right(1);
+            match prev.cmp(&new) {
+                Ordering::Less => children[prev..=new].rotate_left(1),
+                Ordering::Greater => children[new..=prev].rotate_right(1),
+                Ordering::Equal => {}
             }
             new
         };
@@ -281,9 +281,9 @@ impl FileEntry {
 
 #[cfg(test)]
 mod tests {
-    use crate::tree::arena::{Arena, Id};
-    use crate::tree::entry::FileEntry;
-    use crate::tree::path::EntryPath;
+    use crate::arena::{Arena, Id};
+    use crate::entry::FileEntry;
+    use crate::path::EntryPath;
 
     fn new_dir<T: Into<String>>(arena: &mut Arena<FileEntry>, name: T) -> Id {
         arena.put(FileEntry::new_dir(name.into(), 0))
