@@ -117,11 +117,11 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
 
 fn create_progressbar(app: &App) -> ProgressBar {
     let mut items = vec![];
-    let stats = app.scanner.stats();
-    let total = stats.used_size.get_bytes();
+    let stats = &app.stats;
+    let used = stats.used_size.get_bytes();
     if let Some(snapshot) = app.snapshot.as_ref() {
         let current = snapshot.get_root().get_size();
-        let invisible = Byte::from_bytes(total - current.get_bytes());
+        let invisible = Byte::from_bytes(used.saturating_sub(current.get_bytes()));
         items.push(BarItem {
             label: utils::byte_to_str(current, 1),
             weight: current.get_bytes() as f64,
@@ -129,12 +129,45 @@ fn create_progressbar(app: &App) -> ProgressBar {
             fg: Color::White,
             min_ratio: None,
         });
+        if invisible.get_bytes() > 0 {
+            items.push(BarItem {
+                label: utils::byte_to_str(invisible, 1),
+                weight: invisible.get_bytes() as f64,
+                bg: Color::Blue,
+                fg: Color::White,
+                min_ratio: None,
+            });
+        }
+    }
+    if let Some(available) = stats.available_size {
+        if let Some(total) = stats.total_size {
+            let unknown = total
+                .get_bytes()
+                .saturating_sub(available.get_bytes() + used);
+            if unknown > 0 {
+                items.push(BarItem {
+                    label: utils::byte_to_str(Byte::from_bytes(unknown), 1),
+                    weight: if stats.is_mount_point {
+                        unknown as f64
+                    } else {
+                        0.0
+                    },
+                    bg: Color::Gray,
+                    fg: Color::Black,
+                    min_ratio: None,
+                });
+            }
+        }
         items.push(BarItem {
-            label: utils::byte_to_str(invisible, 1),
-            weight: invisible.get_bytes() as f64,
-            bg: Color::Blue,
+            label: utils::byte_to_str(available, 1),
+            weight: if stats.is_mount_point {
+                available.get_bytes() as f64
+            } else {
+                0.0
+            },
+            bg: Color::Green,
             fg: Color::White,
-            min_ratio: Some(0.1),
+            min_ratio: None,
         });
     }
 

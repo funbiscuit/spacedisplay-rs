@@ -12,6 +12,9 @@ use crate::{utils, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
 #[derive(Clone, Debug)]
 pub struct ScanStats {
     pub used_size: Byte,
+    pub total_size: Option<Byte>,
+    pub available_size: Option<Byte>,
+    pub is_mount_point: bool,
     pub files: u64,
     pub dirs: u64,
 }
@@ -82,11 +85,25 @@ impl Scanner {
     }
 
     pub fn stats(&self) -> ScanStats {
-        let stats = self.tree.lock().unwrap().stats();
-        ScanStats {
-            used_size: stats.used_size,
-            files: stats.files,
-            dirs: stats.dirs,
+        let scan_stats = self.tree.lock().unwrap().stats();
+        if let Some(mount_stats) = utils::get_mount_stats(self.root.get_path()) {
+            ScanStats {
+                used_size: scan_stats.used_size,
+                total_size: Some(mount_stats.total),
+                available_size: Some(mount_stats.available),
+                is_mount_point: mount_stats.is_mount_point,
+                files: scan_stats.files,
+                dirs: scan_stats.dirs,
+            }
+        } else {
+            ScanStats {
+                used_size: scan_stats.used_size,
+                total_size: None,
+                available_size: None,
+                is_mount_point: false,
+                files: scan_stats.files,
+                dirs: scan_stats.dirs,
+            }
         }
     }
 

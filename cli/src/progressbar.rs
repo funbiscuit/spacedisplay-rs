@@ -58,6 +58,7 @@ impl Widget for ProgressBar {
 }
 
 fn make_layout(items: &[BarItem], width: usize) -> Vec<(BarItem, usize)> {
+    // remove items that have too small ratio
     let total_weight: f64 = items.iter().map(|item| item.weight).sum();
     let items: Vec<_> = items
         .iter()
@@ -66,22 +67,61 @@ fn make_layout(items: &[BarItem], width: usize) -> Vec<(BarItem, usize)> {
                 .map(|ratio| item.weight > total_weight * ratio)
                 .unwrap_or(true)
         })
+        .cloned()
         .collect();
 
-    let (str_width, mut total_weight) = items
+    // calc total width for labels and total weight of weights
+    let (str_width, total_weight) = items
         .iter()
         .map(|item| (item.label.width(), item.weight))
         .reduce(|a, b| (a.0 + b.0, a.1 + b.1))
         .unwrap();
-    let mut total_spacing = width.saturating_sub(str_width);
 
-    let mut widths = vec![];
-    for item in &items {
-        let spacing = ((total_spacing as f64) * item.weight / total_weight).round() as usize;
-        widths.push(item.label.width() + spacing);
-        total_spacing -= spacing;
-        total_weight -= item.weight;
+    if width <= str_width {
+        // we don't have enough space, so just use min sizes
+        items
+            .into_iter()
+            .map(|i| {
+                let width = i.label.width();
+                (i, width)
+            })
+            .collect()
+    } else {
+        let mut widths = Vec::with_capacity(items.len());
+        let mut width_available = 0.0;
+        let mut total_width = 0 as f64;
+        for item in &items {
+            let item_width = ((width as f64) * item.weight / total_weight).round();
+            let min_width = item.label.width() as f64;
+            let item_width = f64::max(min_width, item_width);
+            widths.push(item_width);
+            if item_width > min_width {
+                width_available += item_width - min_width;
+            }
+            total_width += item_width;
+        }
+        let mut overdraw = total_width - width as f64;
+
+        // remove some space from items that have it to compensate
+        // for overdraw
+        let items: Vec<_> = items
+            .into_iter()
+            .zip(widths.into_iter())
+            .map(|(item, mut width)| {
+                let available = width - item.label.width() as f64;
+                if available > 0.0 {
+                    let sub = f64::min(
+                        ((available / width_available) * overdraw).round(),
+                        available,
+                    );
+                    width_available -= available;
+                    overdraw -= sub;
+                    width -= sub;
+                }
+                (item, width.round() as usize)
+            })
+            .collect();
+
+        items
     }
-
-    items.into_iter().cloned().zip(widths.into_iter()).collect()
 }

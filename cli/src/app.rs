@@ -1,4 +1,6 @@
-use spacedisplay_lib::{EntryPath, EntrySnapshot, Scanner, SnapshotConfig, TreeSnapshot};
+use spacedisplay_lib::{
+    EntryPath, EntrySnapshot, ScanStats, Scanner, SnapshotConfig, TreeSnapshot,
+};
 
 use crate::file_list::FileListState;
 
@@ -15,6 +17,7 @@ pub struct App {
     pub file_list_state: FileListState,
     pub current_path: EntryPath,
     pub snapshot: Option<TreeSnapshot<EntrySnapshot>>,
+    pub stats: ScanStats,
     pub should_quit: bool,
 }
 
@@ -23,12 +26,14 @@ impl App {
         let mut state = FileListState::default();
         state.select(0);
         let current_path = scanner.get_scan_path().clone();
+        let stats = scanner.stats();
         App {
             scanner,
             screen: Screen::Files,
             file_list_state: state,
             current_path,
             snapshot: None,
+            stats,
             should_quit: false,
         }
     }
@@ -123,6 +128,7 @@ impl App {
             None
         };
 
+        self.stats = self.scanner.stats();
         self.snapshot = self.scanner.get_tree(
             &self.current_path,
             SnapshotConfig {
@@ -130,6 +136,12 @@ impl App {
                 min_size: 0,
             },
         );
+        if self.current_path.is_root() {
+            if let Some(snapshot) = self.snapshot.as_ref() {
+                // when root is opened manually set used size in stats
+                self.stats.used_size = snapshot.get_root().get_size()
+            }
+        }
 
         if let Some(name) = selected {
             self.select_entry(&name);

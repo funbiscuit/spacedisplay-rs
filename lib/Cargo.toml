@@ -10,3 +10,8 @@ ptree = "0.4.0"
 
 [target.'cfg(unix)'.dependencies]
 proc-mounts = "0.3.0"
+nix = "0.25.0"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.42.0", features = ["Win32_Foundation", "Win32_Storage_FileSystem"] }
+widestring = "1.0.2"
