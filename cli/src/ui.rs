@@ -1,9 +1,9 @@
 use byte_unit::Byte;
 use tui::backend::Backend;
-use tui::layout::{Alignment, Constraint, Direction, Layout};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
-use tui::widgets::{Block, BorderType, Borders, Paragraph};
+use tui::widgets::{Block, BorderType, Borders, Paragraph, Tabs};
 use tui::Frame;
 
 use spacedisplay_lib::SnapshotConfig;
@@ -14,13 +14,20 @@ use crate::progressbar::{BarItem, ProgressBar};
 use crate::utils;
 
 pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Min(10)].as_ref())
+        .split(frame.size());
+
+    render_menu(frame, chunks[0], app);
+
     match app.screen {
-        Screen::Help => render_controls(frame),
-        Screen::Files => render_files(frame, app),
+        Screen::Help => render_controls(frame, chunks[1]),
+        Screen::Files => render_files(frame, chunks[1], app),
     }
 }
 
-fn render_controls(frame: &mut Frame<impl Backend>) {
+fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
     let lines = vec![
         Spans::from(vec![Span::raw("Welcome to")]),
         Spans::from(vec![Span::styled(
@@ -50,7 +57,7 @@ fn render_controls(frame: &mut Frame<impl Backend>) {
             .borders(Borders::ALL)
             .style(Style::default().fg(Color::White))
             .border_type(BorderType::Plain),
-        frame.size(),
+        rect,
     );
     let mut rect = frame.size();
     if rect.height >= text_height {
@@ -60,17 +67,46 @@ fn render_controls(frame: &mut Frame<impl Backend>) {
     frame.render_widget(home, rect);
 }
 
-fn render_files(frame: &mut Frame<impl Backend>, app: &mut App) {
+fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
-        .split(frame.size());
+        .split(rect);
 
     let list = create_files_list(app);
     let progressbar = create_progressbar(app);
 
     frame.render_stateful_widget(list, chunks[0], &mut app.file_list_state);
     frame.render_widget(progressbar, chunks[1]);
+}
+
+fn render_menu(frame: &mut Frame<impl Backend>, rect: Rect, app: &App) {
+    let titles = app.tab_titles();
+    let titles = titles
+        .iter()
+        .map(|t| {
+            let (first, rest) = t.split_at(1);
+            Spans::from(vec![
+                Span::styled(
+                    first,
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::UNDERLINED),
+                ),
+                Span::styled(rest, Style::default().fg(Color::White)),
+            ])
+        })
+        .collect();
+
+    let tabs = Tabs::new(titles)
+        .select(app.selected_tab())
+        .style(Style::default().fg(Color::Cyan))
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::Black),
+        );
+    frame.render_widget(tabs, rect);
 }
 
 fn create_files_list(app: &mut App) -> FileList<'static> {

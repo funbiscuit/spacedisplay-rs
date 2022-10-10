@@ -106,6 +106,27 @@ impl App {
         }
     }
 
+    pub fn selected_tab(&self) -> usize {
+        match self.screen {
+            Screen::Files => 0,
+            Screen::Help => 1,
+        }
+    }
+
+    pub fn tab_titles(&self) -> Vec<String> {
+        let suffix = if self.scanner.is_scanning() {
+            " (scanning)"
+        } else {
+            ""
+        };
+        let files = format!(
+            "Files at {}{}",
+            self.scanner.get_scan_path().get_name(),
+            suffix
+        );
+        vec![files, "Help".into(), "Quit".into()]
+    }
+
     fn select_entry(&mut self, name: &str) {
         if let Some(snapshot) = self.snapshot.as_ref() {
             self.file_list_state.select(
