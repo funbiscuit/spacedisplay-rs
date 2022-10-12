@@ -25,6 +25,14 @@ pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
         Screen::Help => render_controls(frame, chunks[1]),
         Screen::Files => render_files(frame, chunks[1], app),
     }
+
+    if let Some(dialog) = app.dialog.as_ref() {
+        let (w, h) = dialog.size();
+        let x = chunks[1].x + chunks[1].width.saturating_sub(w) / 2;
+        let y = chunks[1].y + chunks[1].height.saturating_sub(h) / 2;
+        let size = Rect::new(x, y, w, h);
+        frame.render_widget(dialog.get_widget(), size);
+    }
 }
 
 fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
@@ -37,6 +45,7 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
         Spans::from(vec![Span::raw("")]),
         Spans::from(vec![Span::raw("Press:")]),
         Spans::from(vec![Span::raw("'H' or 'F1' to return to this screen")]),
+        Spans::from(vec![Span::raw("'N' to start a new scan")]),
         Spans::from(vec![Span::raw("'F' to open files list")]),
         Spans::from(vec![Span::raw("'Up' and 'Down' to move inside list")]),
         Spans::from(vec![Span::raw(
@@ -143,7 +152,7 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
             Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title(app.current_path.to_string())
+                .title(format!(" {} ", app.current_path))
                 .border_type(BorderType::Plain),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));

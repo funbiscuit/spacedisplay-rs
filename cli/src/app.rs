@@ -1,7 +1,10 @@
+use derivative::Derivative;
+
 use spacedisplay_lib::{
     EntryPath, EntrySnapshot, ScanStats, Scanner, SnapshotConfig, TreeSnapshot,
 };
 
+use crate::dialog::{Dialog, NewScanDialog};
 use crate::file_list::FileListState;
 use crate::term::{InputHandler, InputProvider};
 
@@ -11,7 +14,8 @@ pub enum Screen {
     Files,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct App {
     pub scanner: Scanner,
     pub screen: Screen,
@@ -19,6 +23,8 @@ pub struct App {
     pub current_path: EntryPath,
     pub snapshot: Option<TreeSnapshot<EntrySnapshot>>,
     pub stats: ScanStats,
+    #[derivative(Debug = "ignore")]
+    pub dialog: Option<Box<dyn Dialog>>,
     pub should_quit: bool,
 }
 
@@ -35,12 +41,20 @@ impl App {
             current_path,
             snapshot: None,
             stats,
+            dialog: None,
             should_quit: false,
         }
     }
 
     pub fn check_input<H: InputProvider>(&mut self, provider: &H) {
-        let _ = provider.provide(self);
+        if let Some(mut dialog) = self.dialog.take() {
+            let _ = provider.provide(&mut dialog);
+            if let Err(dialog) = dialog.try_finish(self) {
+                self.dialog = Some(dialog);
+            }
+        } else {
+            let _ = provider.provide(self);
+        }
     }
 
     pub fn on_tick(&mut self) {
@@ -52,6 +66,15 @@ impl App {
             Screen::Files => 0,
             Screen::Help => 1,
         }
+    }
+
+    pub fn start_scan(&mut self, path: String) {
+        self.scanner = Scanner::new(path);
+        self.file_list_state = FileListState::default();
+        self.current_path = self.scanner.get_scan_path().clone();
+        self.stats = self.scanner.stats();
+        self.screen = Screen::Files;
+        self.snapshot = None;
     }
 
     pub fn tab_titles(&self) -> Vec<String> {
@@ -157,6 +180,11 @@ impl InputHandler for App {
             'h' => self.screen = Screen::Help,
             'f' => self.screen = Screen::Files,
             'q' => self.should_quit = true,
+            'n' => {
+                self.dialog = Some(Box::new(NewScanDialog::new(
+                    spacedisplay_lib::get_available_mounts(),
+                )))
+            }
             _ => {}
         }
     }

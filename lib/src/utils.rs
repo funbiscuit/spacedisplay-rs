@@ -2,6 +2,11 @@ use std::path::{Path, PathBuf};
 
 use byte_unit::Byte;
 
+#[cfg(windows)]
+use windows_sys::Win32::Storage::FileSystem;
+#[cfg(windows)]
+use windows_sys::Win32::System::WindowsProgramming;
+
 #[derive(Debug)]
 pub struct MountStats {
     /// Total size of partition
@@ -15,19 +20,34 @@ pub struct MountStats {
     pub is_mount_point: bool,
 }
 
+//todo can add more supported fs
+#[cfg(unix)]
+const SUPPORTED_FS: &[&str] = &["ext2", "ext3", "ext4", "vfat", "ntfs", "fuseblk"];
+
+/// Returns all mount points that can be scanned
+#[cfg(unix)]
+pub fn get_available_mounts() -> Vec<String> {
+    let mut mounts: Vec<_> = proc_mounts::MountIter::new()
+        .unwrap()
+        .map(|mount| mount.unwrap())
+        .filter(|mount| SUPPORTED_FS.contains(&mount.fstype.as_str()))
+        .filter_map(|mount| mount.dest.to_str().map(|s| s.to_string()))
+        .collect();
+    mounts.sort();
+
+    mounts
+}
+
 /// Returns all mount points in system
 ///
 /// Some of them might be supported for scanning but should be excluded when
 /// scanning another mount point
 #[cfg(unix)]
 pub fn get_excluded_paths() -> Vec<PathBuf> {
-    //todo can add more supported fs
-    let supported_fs = vec!["ext2", "ext3", "ext4", "vfat", "ntfs", "fuseblk"];
-
     let mut mounts: Vec<_> = proc_mounts::MountIter::new()
         .unwrap()
         .map(|mount| mount.unwrap())
-        .filter(|mount| !supported_fs.contains(&mount.fstype.as_str()))
+        .filter(|mount| !SUPPORTED_FS.contains(&mount.fstype.as_str()))
         .map(|mount| mount.dest)
         .collect();
     mounts.sort();
@@ -72,6 +92,38 @@ pub fn get_mount_stats<P: AsRef<Path>>(path: P) -> Option<MountStats> {
     })
 }
 
+/// Returns all drives that can be scanned
+#[cfg(windows)]
+pub fn get_available_mounts() -> Vec<String> {
+    // SAFETY: call is always safe
+    let mut drive_mask = unsafe { FileSystem::GetLogicalDrives() };
+
+    let mut name = [b'A', b':', b'\\', 0];
+    let mut drives = vec![];
+
+    for c in b'A'..=b'Z' {
+        if (drive_mask & 1) != 0 {
+            name[0] = c;
+
+            // SAFETY: name is always a valid null terminated ascii string
+            let drive_type = unsafe { FileSystem::GetDriveTypeA(name.as_ptr()) };
+            match drive_type {
+                WindowsProgramming::DRIVE_REMOVABLE
+                | WindowsProgramming::DRIVE_FIXED
+                | WindowsProgramming::DRIVE_REMOTE => {
+                    // SAFETY: name is always a valid ascii string with length == 3
+                    let name = unsafe { std::str::from_utf8_unchecked(&name.as_slice()[..3]) };
+                    drives.push(name.to_string())
+                }
+                _ => {}
+            }
+        }
+        drive_mask >>= 1;
+    }
+
+    drives
+}
+
 #[cfg(windows)]
 pub fn get_excluded_paths() -> Vec<PathBuf> {
     vec![]
@@ -91,7 +143,7 @@ pub fn get_mount_stats<P: AsRef<Path>>(path: P) -> Option<MountStats> {
     // SAFETY: path is a valid widechar str and is null terminated
     // pointers to output variables are valid u64 pointers
     let status = unsafe {
-        windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(
+        FileSystem::GetDiskFreeSpaceExW(
             path.as_ptr(),
             &mut free_bytes,
             &mut total_bytes,

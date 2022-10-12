@@ -10,5 +10,6 @@ anyhow = "1.0"
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
 clap = { version = "4.0.0-rc.2", features = ["derive"] }
 crossterm = { version = "0.25", features = ["serde"] }
+derivative = "2.2.0"
 tui = { version = "0.19", default-features = false, features = ["crossterm"] }
 unicode-width = "0.1.10"
