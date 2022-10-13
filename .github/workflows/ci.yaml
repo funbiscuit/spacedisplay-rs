@@ -77,7 +77,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: artifacts/spacedisplay-win64/spacedisplay-cli.exe
           tag: ${{ github.ref }}
-          asset_name: SpaceDisplay-msvc19-Win32.zip
+          asset_name: spacedisplay-win64.exe
           overwrite: true
 
       - uses: svenstaro/upload-release-action@v2
