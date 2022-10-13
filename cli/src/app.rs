@@ -14,84 +14,57 @@ pub enum Screen {
     Files,
 }
 
-#[derive(Derivative)]
-#[derivative(Debug)]
-pub struct App {
+#[derive(Debug)]
+pub struct FilesApp {
     pub scanner: Scanner,
-    pub screen: Screen,
     pub file_list_state: FileListState,
     pub current_path: EntryPath,
     pub snapshot: Option<TreeSnapshot<EntrySnapshot>>,
     pub stats: ScanStats,
-    #[derivative(Debug = "ignore")]
-    pub dialog: Option<Box<dyn Dialog>>,
-    pub should_quit: bool,
 }
 
-impl App {
-    pub fn new(scanner: Scanner) -> Self {
-        let mut state = FileListState::default();
-        state.select(0);
+impl FilesApp {
+    pub fn new_scan(path: String) -> Self {
+        let scanner = Scanner::new(path);
+        let file_list_state = FileListState::default();
         let current_path = scanner.get_scan_path().clone();
         let stats = scanner.stats();
-        App {
+        FilesApp {
             scanner,
-            screen: Screen::Files,
-            file_list_state: state,
+            file_list_state,
             current_path,
             snapshot: None,
             stats,
-            dialog: None,
-            should_quit: false,
         }
     }
 
-    pub fn check_input<H: InputProvider>(&mut self, provider: &H) {
-        if let Some(mut dialog) = self.dialog.take() {
-            let _ = provider.provide(&mut dialog);
-            if let Err(dialog) = dialog.try_finish(self) {
-                self.dialog = Some(dialog);
+    pub fn go_up(&mut self) {
+        if !self.current_path.is_root() {
+            let name = self.current_path.get_name().to_string();
+            self.current_path.go_up();
+            self.update_snapshot();
+            self.select_entry(&name);
+        }
+    }
+
+    pub fn open_selected(&mut self) {
+        if let Some(snapshot) = self.snapshot.as_ref() {
+            let files: Vec<_> = snapshot.get_root().iter().collect();
+            if let Some(entry) = files.get(self.file_list_state.selected()) {
+                if entry.is_dir() {
+                    self.current_path.join(entry.get_name().to_string());
+                    self.file_list_state.select(0);
+                }
             }
-        } else {
-            let _ = provider.provide(self);
         }
     }
 
-    pub fn on_tick(&mut self) {
-        self.update_snapshot();
+    pub fn select_down(&mut self) {
+        self.file_list_state
+            .select(self.file_list_state.selected() + 1);
     }
 
-    pub fn selected_tab(&self) -> usize {
-        match self.screen {
-            Screen::Files => 0,
-            Screen::Help => 1,
-        }
-    }
-
-    pub fn start_scan(&mut self, path: String) {
-        self.scanner = Scanner::new(path);
-        self.file_list_state = FileListState::default();
-        self.current_path = self.scanner.get_scan_path().clone();
-        self.stats = self.scanner.stats();
-        self.screen = Screen::Files;
-        self.snapshot = None;
-    }
-
-    pub fn tab_titles(&self) -> Vec<String> {
-        let suffix = if self.scanner.is_scanning() {
-            " (scanning)"
-        } else {
-            ""
-        };
-        let files = format!(
-            "Files at {}{}",
-            self.scanner.get_scan_path().get_name(),
-            suffix
-        );
-        vec![files, "Help".into(), "Quit".into()]
-    }
-
-    fn select_entry(&mut self, name: &str) {
+    pub fn select_entry(&mut self, name: &str) {
         if let Some(snapshot) = self.snapshot.as_ref() {
             self.file_list_state.select(
                 snapshot
@@ -103,7 +76,25 @@ impl App {
         }
     }
 
-    fn update_snapshot(&mut self) {
+    pub fn select_up(&mut self) {
+        self.file_list_state
+            .select(self.file_list_state.selected().saturating_sub(1));
+    }
+
+    pub fn tab_title(&self) -> String {
+        let suffix = if self.scanner.is_scanning() {
+            " (scanning)"
+        } else {
+            ""
+        };
+        format!(
+            "Files at {}{}",
+            self.scanner.get_scan_path().get_name(),
+            suffix
+        )
+    }
+
+    pub fn update_snapshot(&mut self) {
         let selected = if let Some(snapshot) = self.snapshot.as_ref() {
             snapshot
                 .get_root()
@@ -134,34 +125,76 @@ impl App {
     }
 }
 
+#[derive(Derivative)]
+#[derivative(Debug)]
+pub struct App {
+    pub files: FilesApp,
+    pub screen: Screen,
+    #[derivative(Debug = "ignore")]
+    pub dialog: Option<Box<dyn Dialog>>,
+    pub should_quit: bool,
+}
+
+impl App {
+    pub fn new(path: String) -> Self {
+        let files = FilesApp::new_scan(path);
+        App {
+            files,
+            screen: Screen::Files,
+            dialog: None,
+            should_quit: false,
+        }
+    }
+
+    pub fn check_input<H: InputProvider>(&mut self, provider: &H) {
+        if let Some(mut dialog) = self.dialog.take() {
+            let _ = provider.provide(&mut dialog);
+            if let Err(dialog) = dialog.try_finish(self) {
+                self.dialog = Some(dialog);
+            }
+        } else {
+            let _ = provider.provide(self);
+        }
+    }
+
+    pub fn on_tick(&mut self) {
+        self.files.update_snapshot();
+    }
+
+    pub fn selected_tab(&self) -> usize {
+        match self.screen {
+            Screen::Files => 0,
+            Screen::Help => 1,
+        }
+    }
+
+    pub fn start_scan(&mut self, path: String) {
+        self.files = FilesApp::new_scan(path);
+        self.screen = Screen::Files;
+    }
+
+    pub fn tab_titles(&self) -> Vec<String> {
+        let files = self.files.tab_title();
+        vec![files, "Help".into(), "Quit".into()]
+    }
+}
+
 impl InputHandler for App {
     fn on_backspace(&mut self) {
-        if !self.current_path.is_root() && self.screen == Screen::Files {
-            let name = self.current_path.get_name().to_string();
-            self.current_path.go_up();
-            self.update_snapshot();
-            self.select_entry(&name);
+        if self.screen == Screen::Files {
+            self.files.go_up();
         }
     }
 
     fn on_down(&mut self) {
         if self.screen == Screen::Files {
-            self.file_list_state
-                .select(self.file_list_state.selected() + 1);
+            self.files.select_down();
         }
     }
 
     fn on_enter(&mut self) {
         if self.screen == Screen::Files {
-            if let Some(snapshot) = self.snapshot.as_ref() {
-                let files: Vec<_> = snapshot.get_root().iter().collect();
-                if let Some(entry) = files.get(self.file_list_state.selected()) {
-                    if entry.is_dir() {
-                        self.current_path.join(entry.get_name().to_string());
-                        self.file_list_state.select(0);
-                    }
-                }
-            }
+            self.files.open_selected();
         }
     }
 
@@ -198,9 +231,8 @@ impl InputHandler for App {
     }
 
     fn on_up(&mut self) {
-        let selected = self.file_list_state.selected();
-        if self.screen == Screen::Files && selected > 0 {
-            self.file_list_state.select(selected - 1);
+        if self.screen == Screen::Files {
+            self.files.select_up()
         }
     }
 }

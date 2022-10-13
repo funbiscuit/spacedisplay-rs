@@ -9,8 +9,6 @@ use crossterm::{event, execute};
 use tui::backend::{Backend, CrosstermBackend};
 use tui::Terminal;
 
-use spacedisplay_lib::Scanner;
-
 use crate::app::App;
 use crate::{ui, Args};
 
@@ -97,7 +95,7 @@ pub fn run(args: Args) -> Result<()> {
 
     let mut terminal = init_terminal()?;
     let runner = AppRunner::new(&mut terminal, args.tick_rate);
-    let app = App::new(Scanner::new(args.path));
+    let app = App::new(args.path);
     let res = runner.run(app);
 
     reset_terminal()?;

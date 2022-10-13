@@ -85,7 +85,7 @@ fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut App) {
     let list = create_files_list(app);
     let progressbar = create_progressbar(app);
 
-    frame.render_stateful_widget(list, chunks[0], &mut app.file_list_state);
+    frame.render_stateful_widget(list, chunks[0], &mut app.files.file_list_state);
     frame.render_widget(progressbar, chunks[1]);
 }
 
@@ -120,9 +120,10 @@ fn render_menu(frame: &mut Frame<impl Backend>, rect: Rect, app: &App) {
 
 fn create_files_list(app: &mut App) -> FileList<'static> {
     let tree = app
+        .files
         .scanner
         .get_tree(
-            &app.current_path,
+            &app.files.current_path,
             SnapshotConfig {
                 max_depth: 1,
                 min_size: 0,
@@ -130,8 +131,8 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
         )
         .unwrap();
     let files: Vec<_> = tree.get_root().iter().collect();
-    if app.file_list_state.selected() >= files.len() && !files.is_empty() {
-        app.file_list_state.select(files.len() - 1);
+    if app.files.file_list_state.selected() >= files.len() && !files.is_empty() {
+        app.files.file_list_state.select(files.len() - 1);
     }
 
     let items: Vec<_> = files
@@ -152,7 +153,7 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
             Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title(format!(" {} ", app.current_path))
+                .title(format!(" {} ", app.files.current_path))
                 .border_type(BorderType::Plain),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -162,9 +163,9 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
 
 fn create_progressbar(app: &App) -> ProgressBar {
     let mut items = vec![];
-    let stats = &app.stats;
+    let stats = &app.files.stats;
     let used = stats.used_size.get_bytes();
-    if let Some(snapshot) = app.snapshot.as_ref() {
+    if let Some(snapshot) = app.files.snapshot.as_ref() {
         let current = snapshot.get_root().get_size();
         let invisible = Byte::from_bytes(used.saturating_sub(current.get_bytes()));
         items.push(BarItem {
