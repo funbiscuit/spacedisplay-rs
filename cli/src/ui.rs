@@ -8,7 +8,7 @@ use tui::Frame;
 
 use spacedisplay_lib::SnapshotConfig;
 
-use crate::app::{App, Screen};
+use crate::app::{App, FilesApp, Screen};
 use crate::file_list::{FileList, FileListItem};
 use crate::progressbar::{BarItem, ProgressBar};
 use crate::utils;
@@ -23,7 +23,10 @@ pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
 
     match app.screen {
         Screen::Help => render_controls(frame, chunks[1]),
-        Screen::Files => render_files(frame, chunks[1], app),
+        Screen::Files if app.files.is_some() => {
+            render_files(frame, chunks[1], app.files.as_mut().unwrap())
+        }
+        _ => {}
     }
 
     if let Some(dialog) = app.dialog.as_ref() {
@@ -76,7 +79,7 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
     frame.render_widget(home, rect);
 }
 
-fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut App) {
+fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut FilesApp) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
@@ -85,7 +88,7 @@ fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut App) {
     let list = create_files_list(app);
     let progressbar = create_progressbar(app);
 
-    frame.render_stateful_widget(list, chunks[0], &mut app.files.file_list_state);
+    frame.render_stateful_widget(list, chunks[0], &mut app.file_list_state);
     frame.render_widget(progressbar, chunks[1]);
 }
 
@@ -118,12 +121,11 @@ fn render_menu(frame: &mut Frame<impl Backend>, rect: Rect, app: &App) {
     frame.render_widget(tabs, rect);
 }
 
-fn create_files_list(app: &mut App) -> FileList<'static> {
+fn create_files_list(app: &mut FilesApp) -> FileList<'static> {
     let tree = app
-        .files
         .scanner
         .get_tree(
-            &app.files.current_path,
+            &app.current_path,
             SnapshotConfig {
                 max_depth: 1,
                 min_size: 0,
@@ -131,8 +133,8 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
         )
         .unwrap();
     let files: Vec<_> = tree.get_root().iter().collect();
-    if app.files.file_list_state.selected() >= files.len() && !files.is_empty() {
-        app.files.file_list_state.select(files.len() - 1);
+    if app.file_list_state.selected() >= files.len() && !files.is_empty() {
+        app.file_list_state.select(files.len() - 1);
     }
 
     let items: Vec<_> = files
@@ -153,7 +155,7 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
             Block::default()
                 .borders(Borders::ALL)
                 .style(Style::default().fg(Color::White))
-                .title(format!(" {} ", app.files.current_path))
+                .title(format!(" {} ", app.current_path))
                 .border_type(BorderType::Plain),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
@@ -161,11 +163,11 @@ fn create_files_list(app: &mut App) -> FileList<'static> {
     list
 }
 
-fn create_progressbar(app: &App) -> ProgressBar {
+fn create_progressbar(app: &FilesApp) -> ProgressBar {
     let mut items = vec![];
-    let stats = &app.files.stats;
+    let stats = &app.stats;
     let used = stats.used_size.get_bytes();
-    if let Some(snapshot) = app.files.snapshot.as_ref() {
+    if let Some(snapshot) = app.snapshot.as_ref() {
         let current = snapshot.get_root().get_size();
         let invisible = Byte::from_bytes(used.saturating_sub(current.get_bytes()));
         items.push(BarItem {

@@ -128,7 +128,7 @@ impl FilesApp {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct App {
-    pub files: FilesApp,
+    pub files: Option<FilesApp>,
     pub screen: Screen,
     #[derivative(Debug = "ignore")]
     pub dialog: Option<Box<dyn Dialog>>,
@@ -136,11 +136,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(path: String) -> Self {
-        let files = FilesApp::new_scan(path);
+    pub fn new() -> Self {
         App {
-            files,
-            screen: Screen::Files,
+            files: None,
+            screen: Screen::Help,
             dialog: None,
             should_quit: false,
         }
@@ -158,43 +157,47 @@ impl App {
     }
 
     pub fn on_tick(&mut self) {
-        self.files.update_snapshot();
+        self.files.as_mut().map(FilesApp::update_snapshot);
     }
 
     pub fn selected_tab(&self) -> usize {
         match self.screen {
             Screen::Files => 0,
+            Screen::Help if self.files.is_none() => 0,
             Screen::Help => 1,
         }
     }
 
     pub fn start_scan(&mut self, path: String) {
-        self.files = FilesApp::new_scan(path);
+        self.files = Some(FilesApp::new_scan(path));
         self.screen = Screen::Files;
     }
 
     pub fn tab_titles(&self) -> Vec<String> {
-        let files = self.files.tab_title();
-        vec![files, "Help".into(), "Quit".into()]
+        if let Some(files) = &self.files {
+            vec![files.tab_title(), "Help".into(), "Quit".into()]
+        } else {
+            vec!["Help".into(), "Quit".into()]
+        }
     }
 }
 
 impl InputHandler for App {
     fn on_backspace(&mut self) {
         if self.screen == Screen::Files {
-            self.files.go_up();
+            self.files.as_mut().map(FilesApp::go_up);
         }
     }
 
     fn on_down(&mut self) {
         if self.screen == Screen::Files {
-            self.files.select_down();
+            self.files.as_mut().map(FilesApp::select_down);
         }
     }
 
     fn on_enter(&mut self) {
         if self.screen == Screen::Files {
-            self.files.open_selected();
+            self.files.as_mut().map(FilesApp::open_selected);
         }
     }
 
@@ -211,7 +214,7 @@ impl InputHandler for App {
     fn on_key(&mut self, c: char) {
         match c {
             'h' => self.screen = Screen::Help,
-            'f' => self.screen = Screen::Files,
+            'f' if self.files.is_some() => self.screen = Screen::Files,
             'q' => self.should_quit = true,
             'n' => {
                 self.dialog = Some(Box::new(NewScanDialog::new(
@@ -232,7 +235,7 @@ impl InputHandler for App {
 
     fn on_up(&mut self) {
         if self.screen == Screen::Files {
-            self.files.select_up()
+            self.files.as_mut().map(FilesApp::select_up);
         }
     }
 }

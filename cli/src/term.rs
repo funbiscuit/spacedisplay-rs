@@ -95,7 +95,10 @@ pub fn run(args: Args) -> Result<()> {
 
     let mut terminal = init_terminal()?;
     let runner = AppRunner::new(&mut terminal, args.tick_rate);
-    let app = App::new(args.path);
+    let mut app = App::new();
+    if let Some(path) = args.path {
+        app.start_scan(path);
+    }
     let res = runner.run(app);
 
     reset_terminal()?;

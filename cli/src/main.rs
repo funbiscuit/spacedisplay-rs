@@ -15,7 +15,7 @@ mod utils;
 #[command(author, version, about, long_about = None)]
 pub struct Args {
     /// Path to directory to scan
-    path: String,
+    path: Option<String>,
 
     /// Refresh rate of terminal UI
     #[arg(short, long, value_parser(parse_duration), default_value("200"))]
