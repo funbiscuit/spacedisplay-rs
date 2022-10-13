@@ -1,3 +1,4 @@
+use num_format::{CustomFormat, Grouping};
 use tui::buffer::Buffer;
 use tui::layout::Rect;
 use tui::style::{Color, Style};
@@ -17,9 +18,14 @@ pub struct BarItem {
 #[derive(Clone, Debug, Default)]
 pub struct ProgressBar {
     parts: Vec<BarItem>,
+    files: u32,
 }
 
 impl ProgressBar {
+    pub fn files(mut self, files: u32) -> ProgressBar {
+        self.files = files;
+        self
+    }
     pub fn parts(mut self, parts: Vec<BarItem>) -> ProgressBar {
         self.parts = parts;
         self
@@ -29,12 +35,28 @@ impl ProgressBar {
 impl Widget for ProgressBar {
     fn render(self, area: Rect, buf: &mut Buffer) {
         buf.set_style(area, Style::default());
+
+        let files = {
+            let format = CustomFormat::builder()
+                .grouping(Grouping::Standard)
+                .separator(" ")
+                .build()
+                .unwrap();
+
+            let mut buf = num_format::Buffer::new();
+            buf.write_formatted(&(self.files), &format);
+
+            format!("{} files ", buf.as_str())
+        };
         let mut gauge_area = area;
-        if gauge_area.height < 1 || gauge_area.width < 3 || self.parts.is_empty() {
+        if gauge_area.height < 1
+            || gauge_area.width < 3 + files.width() as u16
+            || self.parts.is_empty()
+        {
             return;
         }
-        gauge_area.x += 1;
-        gauge_area.width -= 2;
+        gauge_area.x += 1 + files.width() as u16;
+        gauge_area.width -= 2 + files.width() as u16;
 
         let parts = make_layout(&self.parts, gauge_area.width as usize);
 
@@ -54,6 +76,7 @@ impl Widget for ProgressBar {
 
             x += width as u16;
         }
+        buf.set_string(1, gauge_area.y, files, Style::default());
     }
 }
 

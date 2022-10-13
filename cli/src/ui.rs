@@ -219,5 +219,7 @@ fn create_progressbar(app: &FilesApp) -> ProgressBar {
         });
     }
 
-    ProgressBar::default().parts(items)
+    ProgressBar::default()
+        .parts(items)
+        .files(stats.files as u32)
 }
