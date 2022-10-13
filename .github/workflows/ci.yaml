@@ -56,5 +56,34 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
-          name: spacedisplay-win64.exe
+          name: spacedisplay-win64
           path: ${{github.workspace}}/target/release/spacedisplay-cli.exe
+
+  add-release-assets:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [ build-win, build-linux ]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        working-directory: artifacts
+        run: ls -R
+
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/spacedisplay-win64/spacedisplay-cli.exe
+          tag: ${{ github.ref }}
+          asset_name: SpaceDisplay-msvc19-Win32.zip
+          overwrite: true
+
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/spacedisplay-amd64_linux/spacedisplay-cli
+          tag: ${{ github.ref }}
+          asset_name: spacedisplay-amd64_linux
+          overwrite: true
