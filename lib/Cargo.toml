@@ -1,6 +1,15 @@
 [package]
 name = "spacedisplay-lib"
 version = "0.1.0"
+authors = ["Sviatoslav Kokurin <kokurinsv@gmail.com>"]
+description = """
+Library to scan your disk space.
+"""
+repository = "https://github.com/funbiscuit/spacedisplay-rs"
+readme = "../README.md"
+keywords = ["disk", "scan"]
+license = "MIT"
+categories = ["filesystem"]
 edition = "2021"
 
 [dependencies]

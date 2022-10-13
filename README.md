@@ -2,4 +2,4 @@
 
 Simple terminal app to scan your disk space
 
-![demo](images/sample.png)
+![demo](images/demo.gif)
