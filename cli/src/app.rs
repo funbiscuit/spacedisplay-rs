@@ -4,7 +4,7 @@ use spacedisplay_lib::{
     EntryPath, EntrySnapshot, ScanStats, Scanner, SnapshotConfig, TreeSnapshot,
 };
 
-use crate::dialog::{Dialog, NewScanDialog};
+use crate::dialog::{Dialog, NewScanDialog, ScanStatsDialog};
 use crate::file_list::FileListState;
 use crate::term::{InputHandler, InputProvider};
 
@@ -174,11 +174,17 @@ impl App {
     }
 
     pub fn tab_titles(&self) -> Vec<String> {
-        if let Some(files) = &self.files {
-            vec![files.tab_title(), "Help".into(), "Quit".into()]
+        let mut titles = if let Some(files) = &self.files {
+            vec![files.tab_title()]
         } else {
-            vec!["Help".into(), "Quit".into()]
+            vec![]
+        };
+        titles.append(&mut vec!["Help".into(), "New scan".into()]);
+        if self.screen == Screen::Files {
+            titles.push("Scan stats".into());
         }
+        titles.push("Quit".into());
+        titles
     }
 }
 
@@ -213,13 +219,16 @@ impl InputHandler for App {
 
     fn on_key(&mut self, c: char) {
         match c {
-            'h' => self.screen = Screen::Help,
             'f' if self.files.is_some() => self.screen = Screen::Files,
-            'q' => self.should_quit = true,
+            'h' => self.screen = Screen::Help,
             'n' => {
                 self.dialog = Some(Box::new(NewScanDialog::new(
                     spacedisplay_lib::get_available_mounts(),
                 )))
+            }
+            'q' => self.should_quit = true,
+            's' if self.screen == Screen::Files => {
+                self.dialog = Some(Box::new(ScanStatsDialog::new()))
             }
             _ => {}
         }

@@ -3,19 +3,21 @@ use tui::layout::Rect;
 use tui::widgets::Widget;
 
 pub use new_scan::NewScanDialog;
+pub use scan_stats::ScanStatsDialog;
 
 use crate::app::App;
 use crate::term::InputHandler;
 
 mod new_scan;
+mod scan_stats;
 
 pub trait Dialog: InputHandler {
-    fn get_widget(&self) -> DialogWidget;
+    fn get_widget<'a>(&'a self, app: &'a App) -> DialogWidget<'_>;
 
-    fn render(&self, area: Rect, buf: &mut Buffer);
+    fn render(&self, app: &App, area: Rect, buf: &mut Buffer);
 
     /// Returns size of dialog
-    fn size(&self) -> (u16, u16);
+    fn size(&self, app: &App) -> (u16, u16);
 
     /// Attempt to finish dialog
     ///
@@ -64,10 +66,10 @@ impl InputHandler for Box<dyn Dialog> {
     }
 }
 
-pub struct DialogWidget<'a>(&'a dyn Dialog);
+pub struct DialogWidget<'a>(&'a dyn Dialog, &'a App);
 
 impl<'a> Widget for DialogWidget<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        self.0.render(area, buf);
+        self.0.render(self.1, area, buf);
     }
 }

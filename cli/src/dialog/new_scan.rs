@@ -58,11 +58,11 @@ impl InputHandler for NewScanDialog {
 }
 
 impl Dialog for NewScanDialog {
-    fn get_widget(&self) -> DialogWidget {
-        DialogWidget(self)
+    fn get_widget<'a>(&'a self, app: &'a App) -> DialogWidget<'_> {
+        DialogWidget(self, app)
     }
 
-    fn render(&self, area: Rect, buf: &mut Buffer) {
+    fn render(&self, _: &App, area: Rect, buf: &mut Buffer) {
         Clear.render(area, buf);
         buf.set_style(area, Style::default().bg(Color::Black));
 
@@ -87,7 +87,7 @@ impl Dialog for NewScanDialog {
         StatefulWidget::render(list, area, buf, &mut state);
     }
 
-    fn size(&self) -> (u16, u16) {
+    fn size(&self, _: &App) -> (u16, u16) {
         let max_width = std::iter::once(Self::TITLE.width())
             .chain(self.mounts.iter().map(|m| m.width() + 4))
             .max()
@@ -95,9 +95,9 @@ impl Dialog for NewScanDialog {
         (2 + max_width as u16, 2 + self.mounts.len() as u16)
     }
 
-    fn try_finish(mut self: Box<Self>, t: &mut App) -> Result<(), Box<dyn Dialog>> {
+    fn try_finish(mut self: Box<Self>, app: &mut App) -> Result<(), Box<dyn Dialog>> {
         if let Some(mount) = self.chosen {
-            t.start_scan(self.mounts.swap_remove(mount));
+            app.start_scan(self.mounts.swap_remove(mount));
             return Ok(());
         }
 

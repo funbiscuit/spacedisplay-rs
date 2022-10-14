@@ -1,7 +1,8 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use byte_unit::Byte;
 
@@ -17,6 +18,7 @@ pub struct ScanStats {
     pub is_mount_point: bool,
     pub files: u64,
     pub dirs: u64,
+    pub scan_duration: Duration,
 }
 
 #[derive(Debug)]
@@ -29,6 +31,8 @@ pub struct Scanner {
     is_scanning: Arc<AtomicBool>,
 
     scan_flag: Arc<AtomicBool>,
+
+    scan_duration_ms: Arc<AtomicU32>,
 
     scan_handle: Option<JoinHandle<()>>,
 }
@@ -68,11 +72,13 @@ impl Scanner {
         let tree = Arc::new(Mutex::new(tree));
         let is_scanning = Arc::new(AtomicBool::new(true));
         let scan_flag = Arc::new(AtomicBool::new(true));
+        let scan_duration_ms = Arc::new(AtomicU32::new(0));
 
         let scan_handle = Scanner::start_scan(
             Arc::clone(&tree),
             Arc::clone(&is_scanning),
             Arc::clone(&scan_flag),
+            Arc::clone(&scan_duration_ms),
         );
 
         Scanner {
@@ -80,12 +86,15 @@ impl Scanner {
             tree,
             is_scanning,
             scan_flag,
+            scan_duration_ms,
             scan_handle: Some(scan_handle),
         }
     }
 
     pub fn stats(&self) -> ScanStats {
         let scan_stats = self.tree.lock().unwrap().stats();
+        let scan_duration =
+            Duration::from_millis(self.scan_duration_ms.load(Ordering::SeqCst) as u64);
         if let Some(mount_stats) = utils::get_mount_stats(self.root.get_path()) {
             ScanStats {
                 used_size: scan_stats.used_size,
@@ -94,6 +103,7 @@ impl Scanner {
                 is_mount_point: mount_stats.is_mount_point,
                 files: scan_stats.files,
                 dirs: scan_stats.dirs,
+                scan_duration,
             }
         } else {
             ScanStats {
@@ -103,6 +113,7 @@ impl Scanner {
                 is_mount_point: false,
                 files: scan_stats.files,
                 dirs: scan_stats.dirs,
+                scan_duration,
             }
         }
     }
@@ -111,10 +122,13 @@ impl Scanner {
         tree: Arc<Mutex<FileTree>>,
         is_scanning: Arc<AtomicBool>,
         scan_flag: Arc<AtomicBool>,
+        scan_duration_ms: Arc<AtomicU32>,
     ) -> JoinHandle<()> {
         thread::spawn(move || {
             // todo logging
             // println!("background scanner started");
+
+            let start = Instant::now();
 
             let root = {
                 let tree = tree.lock().unwrap();
@@ -160,6 +174,7 @@ impl Scanner {
                 } else {
                     break;
                 }
+                scan_duration_ms.store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
             }
             // println!("background scanner finished");
             is_scanning.store(false, Ordering::SeqCst);

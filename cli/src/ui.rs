@@ -30,11 +30,11 @@ pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
     }
 
     if let Some(dialog) = app.dialog.as_ref() {
-        let (w, h) = dialog.size();
+        let (w, h) = dialog.size(app);
         let x = chunks[1].x + chunks[1].width.saturating_sub(w) / 2;
         let y = chunks[1].y + chunks[1].height.saturating_sub(h) / 2;
         let size = Rect::new(x, y, w, h);
-        frame.render_widget(dialog.get_widget(), size);
+        frame.render_widget(dialog.get_widget(app), size);
     }
 }
 
