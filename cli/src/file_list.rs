@@ -156,7 +156,10 @@ impl<'a> StatefulWidget for FileList<'a> {
             .skip(state.offset)
             .take(end - start)
         {
-            let (x, y) = (list_area.left(), list_area.top() + i as u16);
+            let (x, y) = (
+                list_area.left(),
+                list_area.top() + (i - state.offset) as u16,
+            );
             let area = Rect {
                 x,
                 y,
