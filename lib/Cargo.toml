@@ -15,6 +15,8 @@ edition = "2021"
 [dependencies]
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
 crc = "3.0.0"
+filesize = "0.2.0"
+mountpoints = "0.2.1"
 ptree = "0.4.0"
 
 [target.'cfg(unix)'.dependencies]

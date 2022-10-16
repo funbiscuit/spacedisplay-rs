@@ -5,10 +5,11 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use byte_unit::Byte;
+use filesize::PathExt;
 
 use crate::entry::FileEntry;
 use crate::tree::FileTree;
-use crate::{utils, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
+use crate::{platform, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
 #[derive(Clone, Debug)]
 pub struct ScanStats {
@@ -95,7 +96,7 @@ impl Scanner {
         let scan_stats = self.tree.lock().unwrap().stats();
         let scan_duration =
             Duration::from_millis(self.scan_duration_ms.load(Ordering::SeqCst) as u64);
-        if let Some(mount_stats) = utils::get_mount_stats(self.root.get_path()) {
+        if let Some(mount_stats) = platform::get_mount_stats(self.root.get_path()) {
             ScanStats {
                 used_size: scan_stats.used_size,
                 total_size: Some(mount_stats.total),
@@ -138,7 +139,7 @@ impl Scanner {
             let mut queue: Vec<_> = vec![root];
             let mut children = vec![];
 
-            let excluded = utils::get_excluded_paths();
+            let excluded = platform::get_excluded_paths();
 
             while scan_flag.load(Ordering::SeqCst) {
                 if let Some(s) = queue.pop() {
@@ -147,23 +148,24 @@ impl Scanner {
                         .unwrap_or_default();
 
                     for entry in entries {
-                        let name = entry.file_name().to_str().unwrap().to_string();
-                        //todo retrieving metadata can fail
-                        let metadata = entry.metadata().unwrap();
-                        if metadata.is_dir()
-                            && !metadata.is_symlink()
-                            && !excluded.contains(&entry.path())
-                        {
-                            let mut path = s.clone();
-                            path.join(name.clone());
-                            queue.push(path)
-                        }
+                        if let Ok(metadata) = entry.metadata() {
+                            let name = entry.file_name().to_str().unwrap().to_string();
+                            if metadata.is_dir()
+                                && !metadata.is_symlink()
+                                && !excluded.contains(&entry.path())
+                            {
+                                let mut path = s.clone();
+                                path.join(name.clone());
+                                queue.push(path)
+                            }
 
-                        children.push(FileEntry::new(
-                            name,
-                            metadata.len() as i64,
-                            metadata.is_dir(),
-                        ));
+                            let size = entry
+                                .path()
+                                .size_on_disk_fast(&metadata)
+                                .unwrap_or(metadata.len())
+                                as i64;
+                            children.push(FileEntry::new(name, size, metadata.is_dir()));
+                        }
                     }
                     if !children.is_empty() {
                         let mut tree = tree.lock().unwrap();

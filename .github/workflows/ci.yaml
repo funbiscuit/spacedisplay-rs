@@ -33,6 +33,33 @@ jobs:
           name: spacedisplay-amd64_linux
           path: ${{github.workspace}}/target/release/spacedisplay-cli
 
+  build-macos:
+    runs-on: macos-11
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - uses: Swatinem/rust-cache@v1
+      - name: Check and Test
+        run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: spacedisplay-macos
+          path: ${{github.workspace}}/target/release/spacedisplay-cli
+
   build-win:
     runs-on: windows-2019
     steps:
@@ -62,7 +89,7 @@ jobs:
   add-release-assets:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    needs: [ build-win, build-linux ]
+    needs: [ build-win, build-linux, build-macos ]
     steps:
       - uses: actions/download-artifact@v2
         with:
@@ -86,4 +113,12 @@ jobs:
           file: artifacts/spacedisplay-amd64_linux/spacedisplay-cli
           tag: ${{ github.ref }}
           asset_name: spacedisplay-amd64_linux
+          overwrite: true
+
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/spacedisplay-macos/spacedisplay-cli
+          tag: ${{ github.ref }}
+          asset_name: spacedisplay-macos
           overwrite: true

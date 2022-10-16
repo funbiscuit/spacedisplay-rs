@@ -208,6 +208,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "filesize"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12d741e2415d4e2e5bd1c1d00409d1a8865a57892c2d689b504365655d237d43"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -342,6 +351,16 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.36.1",
+]
+
+[[package]]
+name = "mountpoints"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3090e3ea5226b07cedd89a57c735d3ed0374a84236a85529a1d8bfec98eb8ec5"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -704,6 +723,8 @@ version = "0.1.0"
 dependencies = [
  "byte-unit",
  "crc",
+ "filesize",
+ "mountpoints",
  "nix",
  "proc-mounts",
  "ptree",

@@ -2,15 +2,15 @@
 
 pub use entry_snapshot::{EntrySnapshot, EntrySnapshotRef};
 pub use path::EntryPath;
+pub use platform::get_available_mounts;
 pub use scanner::{ScanStats, Scanner};
 pub use tree_snapshot::{SnapshotConfig, TreeSnapshot};
-pub use utils::get_available_mounts;
 
 mod arena;
 mod entry;
 mod entry_snapshot;
 mod path;
+mod platform;
 mod scanner;
 mod tree;
 mod tree_snapshot;
-mod utils;
