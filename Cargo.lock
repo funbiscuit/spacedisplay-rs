@@ -704,7 +704,7 @@ checksum = "2fd0db749597d91ff862fd1d55ea87f7855a744a8425a64695b6fca237d1dad1"
 
 [[package]]
 name = "spacedisplay-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "byte-unit",
@@ -719,7 +719,7 @@ dependencies = [
 
 [[package]]
 name = "spacedisplay-lib"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "byte-unit",
  "crc",
