@@ -169,9 +169,8 @@ impl Scanner {
                     }
                     if !children.is_empty() {
                         let mut tree = tree.lock().unwrap();
-                        while let Some(child) = children.pop() {
-                            tree.add_child(&s, child);
-                        }
+                        tree.set_children(&s, children);
+                        children = vec![];
                     }
                 } else {
                     break;
