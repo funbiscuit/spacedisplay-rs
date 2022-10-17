@@ -27,6 +27,8 @@ pub struct ScanStats {
 struct ScanState {
     tree: Mutex<FileTree>,
 
+    current_path: Mutex<Option<EntryPath>>,
+
     is_scanning: AtomicBool,
 
     scan_flag: AtomicBool,
@@ -53,6 +55,10 @@ pub struct Scanner {
 impl Scanner {
     pub fn get_scan_path(&self) -> &EntryPath {
         &self.root
+    }
+
+    pub fn get_current_scan_path(&self) -> Option<EntryPath> {
+        self.state.current_path.lock().unwrap().clone()
     }
 
     pub fn get_tree(
@@ -91,6 +97,7 @@ impl Scanner {
         .unwrap();
         let state = Arc::new(ScanState {
             tree: Mutex::new(tree),
+            current_path: Mutex::new(None),
             is_scanning: AtomicBool::new(false),
             scan_flag: AtomicBool::new(true),
             scan_duration_ms: AtomicU32::new(0),
@@ -178,6 +185,11 @@ impl Scanner {
 
                 let mut rx_empty = true;
                 if let Some(task) = queue.pop() {
+                    state
+                        .current_path
+                        .lock()
+                        .unwrap()
+                        .replace(task.path.clone());
                     let entries: Vec<_> = std::fs::read_dir(&task.path.get_path())
                         .and_then(|dir| dir.collect::<Result<_, _>>())
                         .unwrap_or_default();
@@ -216,6 +228,7 @@ impl Scanner {
                 }
                 if queue.is_empty() && rx_empty {
                     state.is_scanning.store(false, Ordering::SeqCst);
+                    state.current_path.lock().unwrap().take();
                 }
                 state
                     .scan_duration_ms

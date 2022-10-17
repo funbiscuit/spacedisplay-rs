@@ -13,6 +13,8 @@ use crate::utils;
 pub struct FileListState {
     offset: usize,
     selected: usize,
+    busy_item: Option<usize>,
+    spinner_state: usize,
 }
 
 impl FileListState {
@@ -22,6 +24,10 @@ impl FileListState {
 
     pub fn select(&mut self, index: usize) {
         self.selected = index;
+    }
+
+    pub fn set_busy_item(&mut self, busy_item: Option<usize>) {
+        self.busy_item = busy_item;
     }
 }
 
@@ -53,6 +59,8 @@ pub struct FileList<'a> {
     items: Vec<FileListItem>,
     highlight_style: Style,
 }
+
+const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
 impl<'a> FileList<'a> {
     pub fn new<T>(items: T) -> FileList<'a>
@@ -143,9 +151,10 @@ impl<'a> StatefulWidget for FileList<'a> {
         state.offset = start;
 
         let highlight_symbol = " > ";
-        let blank_symbol = " ".repeat(highlight_symbol.width());
-        // space between name and size bar, size bar and size str, size str and border
-        let spaces = 3;
+        let busy_symbol = SPINNER[state.spinner_state].to_string();
+        let blank_symbol = " ".repeat(3);
+        // space between elements
+        let spaces = 5;
 
         let total_size: u64 = self.items.iter().map(|f| f.size.get_bytes()).sum();
 
@@ -187,6 +196,14 @@ impl<'a> StatefulWidget for FileList<'a> {
             if is_selected {
                 buf.set_style(area, self.highlight_style);
             }
+            if state.busy_item == Some(i) {
+                buf.set_string(
+                    elem_x + max_name_width + 1,
+                    y,
+                    busy_symbol.clone(),
+                    Style::default().fg(Color::LightYellow),
+                );
+            }
 
             let size_str = utils::byte_to_str(item.size, 0);
             let size_width = list_area.width.saturating_sub(
@@ -198,7 +215,7 @@ impl<'a> StatefulWidget for FileList<'a> {
             let size_frac = size - size_full as f64;
 
             buf.set_string(
-                elem_x + max_name_width + 1,
+                elem_x + max_name_width + 3,
                 y,
                 " ".repeat(size_full as usize),
                 Style::default().bg(Color::LightYellow),
@@ -208,12 +225,14 @@ impl<'a> StatefulWidget for FileList<'a> {
             str.push(' ');
             str.push_str(&size_str);
             buf.set_string(
-                elem_x + max_name_width + 1 + size_full as u16,
+                elem_x + max_name_width + 3 + size_full as u16,
                 y,
                 &str,
                 Style::default().fg(Color::LightYellow),
             );
         }
+
+        state.spinner_state = (state.spinner_state + 1) % SPINNER.len();
     }
 }
 

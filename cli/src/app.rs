@@ -116,10 +116,23 @@ impl FilesApp {
                 min_size: 0,
             },
         );
-        if self.current_path.is_root() {
-            if let Some(snapshot) = self.snapshot.as_ref() {
+        let scanned_path = self.scanner.get_current_scan_path();
+        self.file_list_state.set_busy_item(None);
+        if let Some(snapshot) = self.snapshot.as_ref() {
+            if self.current_path.is_root() {
                 // when root is opened manually set used size in stats
                 self.stats.used_size = snapshot.get_root().get_size()
+            }
+            if let Some(path) = scanned_path {
+                if path > self.current_path {
+                    let name = &path.parts()[self.current_path.parts().len()];
+                    self.file_list_state.set_busy_item(
+                        snapshot
+                            .get_root()
+                            .iter()
+                            .position(|e| e.get_name() == name),
+                    );
+                }
             }
         }
 
@@ -185,6 +198,7 @@ impl App {
         };
         titles.append(&mut vec!["Help".into(), "New scan".into()]);
         if self.screen == Screen::Files {
+            titles.push("Rescan".into());
             titles.push("Scan stats".into());
         }
         titles.push("Quit".into());
