@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -23,17 +24,28 @@ pub struct ScanStats {
 }
 
 #[derive(Debug)]
+struct ScanState {
+    tree: Mutex<FileTree>,
+
+    is_scanning: AtomicBool,
+
+    scan_flag: AtomicBool,
+
+    scan_duration_ms: AtomicU32,
+}
+
+struct ScanTask {
+    path: EntryPath,
+    recursive: bool,
+}
+
+#[derive(Debug)]
 pub struct Scanner {
     root: EntryPath,
 
-    //todo use channels for communication with scanner thread
-    tree: Arc<Mutex<FileTree>>,
+    state: Arc<ScanState>,
 
-    is_scanning: Arc<AtomicBool>,
-
-    scan_flag: Arc<AtomicBool>,
-
-    scan_duration_ms: Arc<AtomicU32>,
+    tx: Sender<ScanTask>,
 
     scan_handle: Option<JoinHandle<()>>,
 }
@@ -48,7 +60,7 @@ impl Scanner {
         root: &EntryPath,
         config: SnapshotConfig,
     ) -> Option<TreeSnapshot<EntrySnapshot>> {
-        self.tree.lock().unwrap().make_snapshot(root, config)
+        self.state.tree.lock().unwrap().make_snapshot(root, config)
     }
 
     pub fn get_tree_wrapped<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>>(
@@ -57,45 +69,56 @@ impl Scanner {
         config: SnapshotConfig,
         wrapper: Box<dyn Fn(EntrySnapshot) -> W>,
     ) -> Option<TreeSnapshot<W>> {
-        self.tree
+        self.state
+            .tree
             .lock()
             .unwrap()
             .make_snapshot_wrapped(root, config, wrapper)
     }
 
     pub fn is_scanning(&self) -> bool {
-        self.is_scanning.load(Ordering::SeqCst)
+        self.state.is_scanning.load(Ordering::SeqCst)
     }
 
     pub fn new(path: String) -> Self {
         let tree = FileTree::new(path);
         let root = tree.get_root().get_path(tree.get_arena());
-        let tree = Arc::new(Mutex::new(tree));
-        let is_scanning = Arc::new(AtomicBool::new(true));
-        let scan_flag = Arc::new(AtomicBool::new(true));
-        let scan_duration_ms = Arc::new(AtomicU32::new(0));
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(ScanTask {
+            path: root.clone(),
+            recursive: true,
+        })
+        .unwrap();
+        let state = Arc::new(ScanState {
+            tree: Mutex::new(tree),
+            is_scanning: AtomicBool::new(false),
+            scan_flag: AtomicBool::new(true),
+            scan_duration_ms: AtomicU32::new(0),
+        });
 
-        let scan_handle = Scanner::start_scan(
-            Arc::clone(&tree),
-            Arc::clone(&is_scanning),
-            Arc::clone(&scan_flag),
-            Arc::clone(&scan_duration_ms),
-        );
+        let scan_handle = Scanner::start_scan(Arc::clone(&state), tx.clone(), rx);
 
         Scanner {
             root,
-            tree,
-            is_scanning,
-            scan_flag,
-            scan_duration_ms,
+            state,
+            tx,
             scan_handle: Some(scan_handle),
         }
     }
 
+    pub fn rescan_path(&self, path: EntryPath) {
+        self.tx
+            .send(ScanTask {
+                path,
+                recursive: true,
+            })
+            .unwrap();
+    }
+
     pub fn stats(&self) -> ScanStats {
-        let scan_stats = self.tree.lock().unwrap().stats();
+        let scan_stats = self.state.tree.lock().unwrap().stats();
         let scan_duration =
-            Duration::from_millis(self.scan_duration_ms.load(Ordering::SeqCst) as u64);
+            Duration::from_millis(self.state.scan_duration_ms.load(Ordering::SeqCst) as u64);
         if let Some(mount_stats) = platform::get_mount_stats(self.root.get_path()) {
             ScanStats {
                 used_size: scan_stats.used_size,
@@ -120,43 +143,61 @@ impl Scanner {
     }
 
     fn start_scan(
-        tree: Arc<Mutex<FileTree>>,
-        is_scanning: Arc<AtomicBool>,
-        scan_flag: Arc<AtomicBool>,
-        scan_duration_ms: Arc<AtomicU32>,
+        state: Arc<ScanState>,
+        tx: Sender<ScanTask>,
+        rx: Receiver<ScanTask>,
     ) -> JoinHandle<()> {
         thread::spawn(move || {
             // todo logging
             // println!("background scanner started");
 
-            let start = Instant::now();
+            let mut start = Instant::now();
 
-            let root = {
-                let tree = tree.lock().unwrap();
-                tree.get_root().get_path(tree.get_arena())
-            };
-
-            let mut queue: Vec<_> = vec![root];
+            let mut queue: Vec<_> = vec![];
             let mut children = vec![];
 
             let excluded = platform::get_excluded_paths();
 
-            while scan_flag.load(Ordering::SeqCst) {
-                if let Some(s) = queue.pop() {
-                    let entries: Vec<_> = std::fs::read_dir(&s.get_path())
+            while state.scan_flag.load(Ordering::SeqCst) {
+                // wait until something is added to queue or scanner dropped
+                while queue.is_empty() && state.scan_flag.load(Ordering::SeqCst) {
+                    if let Ok(path) = rx.recv_timeout(Duration::from_millis(10)) {
+                        queue.push(path);
+                        break;
+                    }
+                }
+                // add all other remaining tasks to queue
+                for task in rx.try_iter() {
+                    queue.push(task);
+                }
+
+                if !state.is_scanning.load(Ordering::SeqCst) {
+                    start = Instant::now();
+                    state.is_scanning.store(true, Ordering::SeqCst);
+                }
+
+                let mut rx_empty = true;
+                if let Some(task) = queue.pop() {
+                    let entries: Vec<_> = std::fs::read_dir(&task.path.get_path())
                         .and_then(|dir| dir.collect::<Result<_, _>>())
                         .unwrap_or_default();
 
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
                             let name = entry.file_name().to_str().unwrap().to_string();
-                            if metadata.is_dir()
+                            if task.recursive
+                                && metadata.is_dir()
                                 && !metadata.is_symlink()
                                 && !excluded.contains(&entry.path())
                             {
-                                let mut path = s.clone();
+                                let mut path = task.path.clone();
                                 path.join(name.clone());
-                                queue.push(path)
+                                tx.send(ScanTask {
+                                    path,
+                                    recursive: true,
+                                })
+                                .unwrap();
+                                rx_empty = false;
                             }
 
                             let size = entry
@@ -168,24 +209,25 @@ impl Scanner {
                         }
                     }
                     if !children.is_empty() {
-                        let mut tree = tree.lock().unwrap();
-                        tree.set_children(&s, children);
+                        let mut tree = state.tree.lock().unwrap();
+                        tree.set_children(&task.path, children);
                         children = vec![];
                     }
-                } else {
-                    break;
                 }
-                scan_duration_ms.store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
+                if queue.is_empty() && rx_empty {
+                    state.is_scanning.store(false, Ordering::SeqCst);
+                }
+                state
+                    .scan_duration_ms
+                    .store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
             }
-            // println!("background scanner finished");
-            is_scanning.store(false, Ordering::SeqCst);
         })
     }
 }
 
 impl Drop for Scanner {
     fn drop(&mut self) {
-        self.scan_flag.store(false, Ordering::SeqCst);
+        self.state.scan_flag.store(false, Ordering::SeqCst);
         let _ = self.scan_handle.take().unwrap().join();
     }
 }

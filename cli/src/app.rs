@@ -61,6 +61,10 @@ impl FilesApp {
         }
     }
 
+    pub fn rescan(&mut self) {
+        self.scanner.rescan_path(self.current_path.clone());
+    }
+
     pub fn select_down(&mut self) {
         self.file_list_state
             .select(self.file_list_state.selected() + 1);
@@ -212,8 +216,10 @@ impl InputHandler for App {
     }
 
     fn on_fn(&mut self, n: u8) {
-        if n == 1 {
-            self.screen = Screen::Help;
+        match n {
+            1 => self.screen = Screen::Help,
+            5 if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(),
+            _ => {}
         }
     }
 
@@ -226,6 +232,7 @@ impl InputHandler for App {
                     spacedisplay_lib::get_available_mounts(),
                 )))
             }
+            'r' if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(),
             'q' => self.should_quit = true,
             's' if self.screen == Screen::Files => {
                 self.dialog = Some(Box::new(ScanStatsDialog::new()))

@@ -49,6 +49,7 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
         Spans::from(vec![Span::raw("Press:")]),
         Spans::from(vec![Span::raw("'H' or 'F1' to return to this screen")]),
         Spans::from(vec![Span::raw("'N' to start a new scan")]),
+        Spans::from(vec![Span::raw("'R' or 'F5' to rescan opened directory")]),
         Spans::from(vec![Span::raw("'F' to open files list")]),
         Spans::from(vec![Span::raw("'Up' and 'Down' to move inside list")]),
         Spans::from(vec![Span::raw(
