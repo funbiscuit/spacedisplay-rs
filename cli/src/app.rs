@@ -54,6 +54,8 @@ impl FilesApp {
                 if entry.is_dir() {
                     self.current_path.join(entry.get_name().to_string());
                     self.file_list_state.select(0);
+                    self.snapshot = None;
+                    self.update_snapshot();
                 }
             }
         }
@@ -95,14 +97,12 @@ impl FilesApp {
     }
 
     pub fn update_snapshot(&mut self) {
-        let selected = if let Some(snapshot) = self.snapshot.as_ref() {
+        let selected = self.snapshot.as_ref().and_then(|snapshot| {
             snapshot
                 .get_root()
                 .get_nth_child(self.file_list_state.selected())
                 .map(|e| e.get_name().to_string())
-        } else {
-            None
-        };
+        });
 
         self.stats = self.scanner.stats();
         self.snapshot = self.scanner.get_tree(
