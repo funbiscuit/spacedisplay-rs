@@ -6,7 +6,6 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use byte_unit::Byte;
-use filesize::PathExt;
 
 use crate::entry::FileEntry;
 use crate::tree::FileTree;
@@ -212,11 +211,7 @@ impl Scanner {
                                 rx_empty = false;
                             }
 
-                            let size = entry
-                                .path()
-                                .size_on_disk_fast(&metadata)
-                                .unwrap_or(metadata.len())
-                                as i64;
+                            let size = platform::get_file_size(&metadata) as i64;
                             children.push(FileEntry::new(name, size, metadata.is_dir()));
                         }
                     }

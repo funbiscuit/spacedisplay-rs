@@ -1,8 +1,17 @@
+use std::fs::Metadata;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 use byte_unit::Byte;
 
 use crate::platform::MountStats;
+
+/// Retrieve file size
+///
+/// On unix return file size on disk since its fast
+pub fn get_file_size(metadata: &Metadata) -> u64 {
+    metadata.blocks() * 512
+}
 
 /// Returns stats about given path
 ///

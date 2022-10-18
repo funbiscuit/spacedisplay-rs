@@ -1,5 +1,7 @@
 use crate::platform::MountStats;
 use byte_unit::Byte;
+use std::fs::Metadata;
+use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use windows_sys::Win32::Storage::FileSystem;
 use windows_sys::Win32::System::WindowsProgramming;
@@ -37,6 +39,14 @@ pub fn get_available_mounts() -> Vec<String> {
 
 pub fn get_excluded_paths() -> Vec<PathBuf> {
     vec![]
+}
+
+/// Retrieve file size
+///
+/// On windows return normal file size since retrieving actual size on disk
+/// is much slower and not very useful
+pub fn get_file_size(metadata: &Metadata) -> u64 {
+    metadata.file_size()
 }
 
 /// Returns stats about given path
