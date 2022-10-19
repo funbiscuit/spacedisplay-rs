@@ -71,10 +71,10 @@ impl EntryPath {
     ///
     /// Returns `None` if path doesn't start from root or if it contains non unicode characters
     /// and can't be represented as String
-    pub fn from(root: &Path, path: &Path) -> Option<Self> {
-        let child_path = path.strip_prefix(root).ok()?;
+    pub fn from<P1: AsRef<Path>, P2: AsRef<Path>>(root: P1, path: P2) -> Option<Self> {
+        let child_path = path.as_ref().strip_prefix(root.as_ref()).ok()?;
 
-        let parts = std::iter::once(root.as_os_str())
+        let parts = std::iter::once(root.as_ref().as_os_str())
             .chain(child_path.iter())
             .map(|s| s.to_str().map(|s| s.to_string()))
             .collect::<Option<Vec<_>>>()?;

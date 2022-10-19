@@ -9,6 +9,7 @@ use byte_unit::Byte;
 
 use crate::entry::FileEntry;
 use crate::tree::FileTree;
+use crate::watcher::Watcher;
 use crate::{platform, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
 #[derive(Clone, Debug)]
@@ -35,6 +36,7 @@ struct ScanState {
     scan_duration_ms: AtomicU32,
 }
 
+#[derive(Debug)]
 struct ScanTask {
     path: EntryPath,
     recursive: bool,
@@ -86,7 +88,7 @@ impl Scanner {
     }
 
     pub fn new(path: String) -> Self {
-        let tree = FileTree::new(path);
+        let tree = FileTree::new(path.clone());
         let root = tree.get_root().get_path(tree.get_arena());
         let (tx, rx) = std::sync::mpsc::channel();
         tx.send(ScanTask {
@@ -102,7 +104,7 @@ impl Scanner {
             scan_duration_ms: AtomicU32::new(0),
         });
 
-        let scan_handle = Scanner::start_scan(Arc::clone(&state), tx.clone(), rx);
+        let scan_handle = Scanner::start_scan(path, Arc::clone(&state), tx.clone(), rx);
 
         Scanner {
             root,
@@ -149,6 +151,7 @@ impl Scanner {
     }
 
     fn start_scan(
+        root: String,
         state: Arc<ScanState>,
         tx: Sender<ScanTask>,
         rx: Receiver<ScanTask>,
@@ -156,6 +159,8 @@ impl Scanner {
         thread::spawn(move || {
             // todo logging
             // println!("background scanner started");
+
+            let mut watcher = crate::watcher::new_watcher(root.clone());
 
             let mut start = Instant::now();
 
@@ -165,25 +170,38 @@ impl Scanner {
             let excluded = platform::get_excluded_paths();
 
             while state.scan_flag.load(Ordering::SeqCst) {
-                // wait until something is added to queue or scanner dropped
-                while queue.is_empty() && state.scan_flag.load(Ordering::SeqCst) {
-                    if let Ok(path) = rx.recv_timeout(Duration::from_millis(10)) {
-                        queue.push(path);
+                while state.scan_flag.load(Ordering::SeqCst) {
+                    // check for events
+                    //todo remove duplicates
+                    if let Some(w) = &mut watcher {
+                        queue.extend(
+                            w.read_events()
+                                .into_iter()
+                                .filter_map(|e| EntryPath::from(&root, &e.updated_path))
+                                .map(|path| ScanTask {
+                                    recursive: false,
+                                    path,
+                                }),
+                        );
+                    }
+                    // add all tasks to queue
+                    for task in rx.try_iter() {
+                        queue.push(task);
+
+                        if !state.is_scanning.load(Ordering::SeqCst) {
+                            start = Instant::now();
+                            state.is_scanning.store(true, Ordering::SeqCst);
+                        }
+                    }
+                    if !queue.is_empty() {
                         break;
                     }
-                }
-                // add all other remaining tasks to queue
-                for task in rx.try_iter() {
-                    queue.push(task);
-                }
-
-                if !state.is_scanning.load(Ordering::SeqCst) {
-                    start = Instant::now();
-                    state.is_scanning.store(true, Ordering::SeqCst);
+                    thread::sleep(Duration::from_millis(10));
                 }
 
                 let mut rx_empty = true;
                 if let Some(task) = queue.pop() {
+                    watcher.as_mut().map(|w| w.add_dir(task.path.to_string()));
                     state
                         .current_path
                         .lock()
@@ -196,19 +214,20 @@ impl Scanner {
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
                             let name = entry.file_name().to_str().unwrap().to_string();
-                            if task.recursive
-                                && metadata.is_dir()
+                            if metadata.is_dir()
                                 && !metadata.is_symlink()
                                 && !excluded.contains(&entry.path())
                             {
                                 let mut path = task.path.clone();
                                 path.join(name.clone());
-                                tx.send(ScanTask {
-                                    path,
-                                    recursive: true,
-                                })
-                                .unwrap();
-                                rx_empty = false;
+                                if task.recursive {
+                                    tx.send(ScanTask {
+                                        path,
+                                        recursive: true,
+                                    })
+                                    .unwrap();
+                                    rx_empty = false;
+                                }
                             }
 
                             let size = platform::get_file_size(&metadata) as i64;
@@ -217,17 +236,20 @@ impl Scanner {
                     }
                     if !children.is_empty() {
                         let mut tree = state.tree.lock().unwrap();
+                        //todo process new paths
                         tree.set_children(&task.path, children);
                         children = vec![];
                     }
+                }
+                if state.is_scanning.load(Ordering::SeqCst) {
+                    state
+                        .scan_duration_ms
+                        .store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
                 }
                 if queue.is_empty() && rx_empty {
                     state.is_scanning.store(false, Ordering::SeqCst);
                     state.current_path.lock().unwrap().take();
                 }
-                state
-                    .scan_duration_ms
-                    .store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
             }
         })
     }

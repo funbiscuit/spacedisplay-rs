@@ -3,6 +3,7 @@ use byte_unit::Byte;
 use std::fs::Metadata;
 use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use widestring::{U16CStr, U16CString};
 use windows_sys::Win32::Storage::FileSystem;
 use windows_sys::Win32::System::WindowsProgramming;
 
@@ -49,11 +50,29 @@ pub fn get_file_size(metadata: &Metadata) -> u64 {
     metadata.file_size()
 }
 
+pub fn get_long_path<T: AsRef<U16CStr>>(str: T) -> Option<U16CString> {
+    let str = str.as_ref().as_ptr();
+    // SAFETY: str is a valid wide string, this call will return required size of buffer
+    let len = unsafe { FileSystem::GetLongPathNameW(str, std::ptr::null_mut(), 0) };
+    if len == 0 {
+        return None;
+    }
+    // when buffer is small, returned len includes null terminator
+    let mut vec = vec![0u16; len as usize];
+    // SAFETY: str is a valid wide string, vec is a valid buffer of required len
+    let len = unsafe { FileSystem::GetLongPathNameW(str, vec.as_mut_ptr(), len) };
+    // when chars are copied, len does not include null terminator
+    if len + 1 == vec.len() as u32 {
+        U16CString::from_vec(vec).ok()
+    } else {
+        None
+    }
+}
+
 /// Returns stats about given path
 ///
 /// Returns total and available space of partition that contains path
 pub fn get_mount_stats<P: AsRef<Path>>(path: P) -> Option<MountStats> {
-    use widestring::U16CString;
     let is_mount_point = path.as_ref().parent().is_none();
     let path = U16CString::from_os_str(path.as_ref()).ok()?;
 

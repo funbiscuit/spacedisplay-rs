@@ -14,3 +14,4 @@ mod platform;
 mod scanner;
 mod tree;
 mod tree_snapshot;
+mod watcher;
