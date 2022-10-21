@@ -214,32 +214,49 @@ impl Scanner {
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
                             let name = entry.file_name().to_str().unwrap().to_string();
-                            if metadata.is_dir()
+                            if task.recursive
+                                && metadata.is_dir()
                                 && !metadata.is_symlink()
                                 && !excluded.contains(&entry.path())
                             {
                                 let mut path = task.path.clone();
                                 path.join(name.clone());
-                                if task.recursive {
-                                    tx.send(ScanTask {
-                                        path,
-                                        recursive: true,
-                                    })
-                                    .unwrap();
-                                    rx_empty = false;
-                                }
+                                tx.send(ScanTask {
+                                    path,
+                                    recursive: true,
+                                })
+                                .unwrap();
+                                rx_empty = false;
                             }
 
                             let size = platform::get_file_size(&metadata) as i64;
-                            children.push(FileEntry::new(name, size, metadata.is_dir()));
+                            children.push(FileEntry::new(
+                                name,
+                                size,
+                                metadata.is_dir() && !metadata.is_symlink(),
+                            ));
                         }
                     }
-                    if !children.is_empty() {
+                    let new_dirs = {
                         let mut tree = state.tree.lock().unwrap();
-                        //todo process new paths
-                        tree.set_children(&task.path, children);
-                        children = vec![];
+                        tree.set_children(&task.path, children)
+                    };
+
+                    if let Some(new_dirs) = new_dirs {
+                        if !task.recursive {
+                            for dir in new_dirs {
+                                let mut path = task.path.clone();
+                                path.join(dir);
+                                tx.send(ScanTask {
+                                    path,
+                                    recursive: false,
+                                })
+                                .unwrap();
+                                rx_empty = false;
+                            }
+                        }
                     }
+                    children = vec![];
                 }
                 if state.is_scanning.load(Ordering::SeqCst) {
                     state

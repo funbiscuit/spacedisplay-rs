@@ -116,7 +116,11 @@ impl FileTree {
     ///
     /// All existing children at path, if not present in given vec, are removed (recursively)
     /// All new directories are returned
-    pub fn set_children(&mut self, path: &EntryPath, children: Vec<FileEntry>) -> Option<Vec<Id>> {
+    pub fn set_children(
+        &mut self,
+        path: &EntryPath,
+        children: Vec<FileEntry>,
+    ) -> Option<Vec<String>> {
         let parent_id = self.find_entry(path)?;
         //todo probably can increase speed by presorting children
         // and inserting them in bulk
@@ -153,7 +157,7 @@ impl FileTree {
             let child = self.arena.get(child_id);
             if child.is_dir() {
                 self.dirs += 1;
-                new_dirs.push(child_id);
+                new_dirs.push(child.get_name().to_string());
             } else {
                 self.files += 1;
             }
@@ -312,7 +316,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(new_dirs.len(), 1);
-        assert_eq!(tree.get_arena().get(new_dirs[0]).get_name(), "dir1");
+        assert_eq!(new_dirs[0], "dir1");
 
         let snapshot = tree
             .make_snapshot(&root_path(&tree), SnapshotConfig::default())
@@ -355,10 +359,6 @@ mod tests {
             )
             .unwrap();
         tree.get_root().print(tree.get_arena(), 5);
-        let new_dirs: Vec<_> = new_dirs
-            .into_iter()
-            .map(|id| tree.get_arena().get(id).get_name().to_string())
-            .collect();
         assert_eq!(new_dirs.len(), 2);
         assert!(new_dirs.contains(&"dir3".to_string()));
         assert!(new_dirs.contains(&"dir4".to_string()));
