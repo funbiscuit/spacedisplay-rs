@@ -36,7 +36,7 @@ struct ScanState {
     scan_duration_ms: AtomicU32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct ScanTask {
     path: EntryPath,
     recursive: bool,
@@ -104,7 +104,7 @@ impl Scanner {
             scan_duration_ms: AtomicU32::new(0),
         });
 
-        let scan_handle = Scanner::start_scan(path, Arc::clone(&state), tx.clone(), rx);
+        let scan_handle = Scanner::start_scan(path, Arc::clone(&state), rx);
 
         Scanner {
             root,
@@ -150,12 +150,38 @@ impl Scanner {
         }
     }
 
-    fn start_scan(
-        root: String,
-        state: Arc<ScanState>,
-        tx: Sender<ScanTask>,
-        rx: Receiver<ScanTask>,
-    ) -> JoinHandle<()> {
+    fn merge_to_queue(queue: &mut Vec<ScanTask>, task: ScanTask) {
+        // could use Vec::drain_filter, but it's unstable
+        let mut i = 0;
+        let mut insert = 0;
+        while i < queue.len() {
+            let existing = &queue[i];
+
+            if &task != existing
+                && (!task.recursive
+                    || existing
+                        .path
+                        .partial_cmp(&task.path)
+                        .map(|ord| ord == std::cmp::Ordering::Less)
+                        .unwrap_or(true))
+            {
+                // existing task is kept in queue if it is not the same as new task AND
+                // new task is not recursive OR it is recursive but existing task is not scanning
+                // some subdirectory of new task
+
+                if insert != i {
+                    queue.swap(insert, i);
+                }
+                insert += 1;
+            }
+            i += 1;
+        }
+
+        queue.truncate(insert);
+        queue.push(task);
+    }
+
+    fn start_scan(root: String, state: Arc<ScanState>, rx: Receiver<ScanTask>) -> JoinHandle<()> {
         thread::spawn(move || {
             // todo logging
             // println!("background scanner started");
@@ -164,7 +190,7 @@ impl Scanner {
 
             let mut start = Instant::now();
 
-            let mut queue: Vec<_> = vec![];
+            let mut queue: Vec<ScanTask> = vec![];
             let mut children = vec![];
 
             let excluded = platform::get_excluded_paths();
@@ -172,21 +198,22 @@ impl Scanner {
             while state.scan_flag.load(Ordering::SeqCst) {
                 while state.scan_flag.load(Ordering::SeqCst) {
                     // check for events
-                    //todo remove duplicates
                     if let Some(w) = &mut watcher {
-                        queue.extend(
-                            w.read_events()
-                                .into_iter()
-                                .filter_map(|e| EntryPath::from(&root, &e.updated_path))
-                                .map(|path| ScanTask {
-                                    recursive: false,
-                                    path,
-                                }),
-                        );
+                        for task in w
+                            .read_events()
+                            .into_iter()
+                            .filter_map(|e| EntryPath::from(&root, &e.updated_path))
+                            .map(|path| ScanTask {
+                                recursive: false,
+                                path,
+                            })
+                        {
+                            Scanner::merge_to_queue(&mut queue, task);
+                        }
                     }
                     // add all tasks to queue
                     for task in rx.try_iter() {
-                        queue.push(task);
+                        Scanner::merge_to_queue(&mut queue, task);
 
                         if !state.is_scanning.load(Ordering::SeqCst) {
                             start = Instant::now();
@@ -199,7 +226,6 @@ impl Scanner {
                     thread::sleep(Duration::from_millis(10));
                 }
 
-                let mut rx_empty = true;
                 if let Some(task) = queue.pop() {
                     watcher.as_mut().map(|w| w.add_dir(task.path.to_string()));
                     state
@@ -221,12 +247,10 @@ impl Scanner {
                             {
                                 let mut path = task.path.clone();
                                 path.join(name.clone());
-                                tx.send(ScanTask {
+                                queue.push(ScanTask {
                                     path,
                                     recursive: true,
-                                })
-                                .unwrap();
-                                rx_empty = false;
+                                });
                             }
 
                             let size = platform::get_file_size(&metadata) as i64;
@@ -247,12 +271,10 @@ impl Scanner {
                             for dir in new_dirs {
                                 let mut path = task.path.clone();
                                 path.join(dir);
-                                tx.send(ScanTask {
+                                queue.push(ScanTask {
                                     path,
-                                    recursive: false,
-                                })
-                                .unwrap();
-                                rx_empty = false;
+                                    recursive: true,
+                                });
                             }
                         }
                     }
@@ -263,7 +285,7 @@ impl Scanner {
                         .scan_duration_ms
                         .store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
                 }
-                if queue.is_empty() && rx_empty {
+                if queue.is_empty() {
                     state.is_scanning.store(false, Ordering::SeqCst);
                     state.current_path.lock().unwrap().take();
                 }
