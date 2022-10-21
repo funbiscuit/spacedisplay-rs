@@ -19,6 +19,10 @@ pub struct EntrySnapshot {
 }
 
 impl EntrySnapshot {
+    pub fn get_children_count(&self) -> usize {
+        self.children.as_ref().map(|s| s.len()).unwrap_or(0)
+    }
+
     pub fn get_id(&self) -> Id {
         self.id
     }

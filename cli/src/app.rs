@@ -56,13 +56,24 @@ impl FilesApp {
                     self.file_list_state.select(0);
                     self.snapshot = None;
                     self.update_snapshot();
+                    if self
+                        .snapshot
+                        .as_ref()
+                        .map(|s| s.get_root().get_children_count())
+                        .unwrap_or(0)
+                        == 0
+                    {
+                        // dir doesn't have children, try to rescan it
+                        self.rescan(false);
+                    }
                 }
             }
         }
     }
 
-    pub fn rescan(&mut self) {
-        self.scanner.rescan_path(self.current_path.clone());
+    pub fn rescan(&mut self, reset_stopwatch: bool) {
+        self.scanner
+            .rescan_path(self.current_path.clone(), reset_stopwatch);
     }
 
     pub fn select_down(&mut self) {
@@ -232,7 +243,7 @@ impl InputHandler for App {
     fn on_fn(&mut self, n: u8) {
         match n {
             1 => self.screen = Screen::Help,
-            5 if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(),
+            5 if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(true),
             _ => {}
         }
     }
@@ -246,7 +257,7 @@ impl InputHandler for App {
                     spacedisplay_lib::get_available_mounts(),
                 )))
             }
-            'r' if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(),
+            'r' if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(true),
             'q' => self.should_quit = true,
             's' if self.screen == Screen::Files => {
                 self.dialog = Some(Box::new(ScanStatsDialog::new()))

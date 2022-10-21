@@ -39,6 +39,7 @@ struct ScanState {
 #[derive(Debug, Eq, PartialEq)]
 struct ScanTask {
     path: EntryPath,
+    reset_stopwatch: bool,
     recursive: bool,
 }
 
@@ -93,6 +94,7 @@ impl Scanner {
         let (tx, rx) = std::sync::mpsc::channel();
         tx.send(ScanTask {
             path: root.clone(),
+            reset_stopwatch: true,
             recursive: true,
         })
         .unwrap();
@@ -114,10 +116,11 @@ impl Scanner {
         }
     }
 
-    pub fn rescan_path(&self, path: EntryPath) {
+    pub fn rescan_path(&self, path: EntryPath, reset_stopwatch: bool) {
         self.tx
             .send(ScanTask {
                 path,
+                reset_stopwatch,
                 recursive: true,
             })
             .unwrap();
@@ -205,6 +208,7 @@ impl Scanner {
                             .filter_map(|e| EntryPath::from(&root, &e.updated_path))
                             .map(|path| ScanTask {
                                 recursive: false,
+                                reset_stopwatch: false,
                                 path,
                             })
                         {
@@ -213,12 +217,11 @@ impl Scanner {
                     }
                     // add all tasks to queue
                     for task in rx.try_iter() {
-                        Scanner::merge_to_queue(&mut queue, task);
-
-                        if !state.is_scanning.load(Ordering::SeqCst) {
+                        if task.reset_stopwatch && !state.is_scanning.load(Ordering::SeqCst) {
                             start = Instant::now();
                             state.is_scanning.store(true, Ordering::SeqCst);
                         }
+                        Scanner::merge_to_queue(&mut queue, task);
                     }
                     if !queue.is_empty() {
                         break;
@@ -249,6 +252,7 @@ impl Scanner {
                                 path.join(name.clone());
                                 queue.push(ScanTask {
                                     path,
+                                    reset_stopwatch: false,
                                     recursive: true,
                                 });
                             }
@@ -273,6 +277,7 @@ impl Scanner {
                                 path.join(dir);
                                 queue.push(ScanTask {
                                     path,
+                                    reset_stopwatch: false,
                                     recursive: true,
                                 });
                             }
