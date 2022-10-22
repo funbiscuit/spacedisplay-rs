@@ -2,12 +2,14 @@ use tui::buffer::Buffer;
 use tui::layout::Rect;
 use tui::widgets::Widget;
 
+pub use delete::DeleteDialog;
 pub use new_scan::NewScanDialog;
 pub use scan_stats::ScanStatsDialog;
 
 use crate::app::App;
 use crate::term::InputHandler;
 
+mod delete;
 mod new_scan;
 mod scan_stats;
 

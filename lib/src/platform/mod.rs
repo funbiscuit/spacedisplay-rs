@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use byte_unit::Byte;
 
 #[cfg(target_os = "linux")]
@@ -29,4 +31,14 @@ pub struct MountStats {
     /// Whether info was requested for mount point (true)
     /// or for some directory inside mount point
     pub is_mount_point: bool,
+}
+
+pub fn delete_path<T: AsRef<Path>>(path: T) -> bool {
+    if !path.as_ref().exists() {
+        false
+    } else if path.as_ref().is_dir() {
+        std::fs::remove_dir_all(path.as_ref()).is_ok()
+    } else {
+        std::fs::remove_file(path.as_ref()).is_ok()
+    }
 }

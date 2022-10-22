@@ -1,10 +1,11 @@
+use byte_unit::Byte;
 use derivative::Derivative;
 
 use spacedisplay_lib::{
     EntryPath, EntrySnapshot, ScanStats, Scanner, SnapshotConfig, TreeSnapshot,
 };
 
-use crate::dialog::{Dialog, NewScanDialog, ScanStatsDialog};
+use crate::dialog::{DeleteDialog, Dialog, NewScanDialog, ScanStatsDialog};
 use crate::file_list::FileListState;
 use crate::term::{InputHandler, InputProvider};
 
@@ -35,6 +36,20 @@ impl FilesApp {
             current_path,
             snapshot: None,
             stats,
+        }
+    }
+
+    pub fn get_selected(&self) -> Option<(EntryPath, Byte)> {
+        if let Some(entry) = self
+            .snapshot
+            .as_ref()
+            .and_then(|s| s.get_root().get_nth_child(self.file_list_state.selected()))
+        {
+            let mut path = self.current_path.clone();
+            path.join(entry.get_name().to_string());
+            Some((path, entry.get_size()))
+        } else {
+            None
         }
     }
 
@@ -250,6 +265,11 @@ impl InputHandler for App {
 
     fn on_key(&mut self, c: char) {
         match c {
+            'd' if self.screen == Screen::Files => {
+                if let Some((path, size)) = self.files.as_mut().unwrap().get_selected() {
+                    self.dialog = Some(Box::new(DeleteDialog::new(path, size)))
+                }
+            }
             'f' if self.files.is_some() => self.screen = Screen::Files,
             'h' => self.screen = Screen::Help,
             'n' => {
