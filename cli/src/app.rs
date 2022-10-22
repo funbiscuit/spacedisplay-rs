@@ -177,6 +177,7 @@ pub struct App {
     pub screen: Screen,
     #[derivative(Debug = "ignore")]
     pub dialog: Option<Box<dyn Dialog>>,
+    pub dialog_menu: Option<usize>,
     pub should_quit: bool,
 }
 
@@ -186,6 +187,7 @@ impl App {
             files: None,
             screen: Screen::Help,
             dialog: None,
+            dialog_menu: None,
             should_quit: false,
         }
     }
@@ -195,6 +197,8 @@ impl App {
             let _ = provider.provide(&mut dialog);
             if let Err(dialog) = dialog.try_finish(self) {
                 self.dialog = Some(dialog);
+            } else {
+                self.dialog_menu = None;
             }
         } else {
             let _ = provider.provide(self);
@@ -206,10 +210,15 @@ impl App {
     }
 
     pub fn selected_tab(&self) -> usize {
-        match self.screen {
-            Screen::Files => 0,
-            Screen::Help if self.files.is_none() => 0,
-            Screen::Help => 1,
+        let add = if self.files.is_none() { 0 } else { 1 };
+
+        if let Some(dialog) = self.dialog_menu {
+            dialog + add
+        } else {
+            match self.screen {
+                Screen::Files => 0,
+                Screen::Help => add,
+            }
         }
     }
 
@@ -226,6 +235,7 @@ impl App {
         };
         titles.append(&mut vec!["Help".into(), "New scan".into()]);
         if self.screen == Screen::Files {
+            titles.push("Delete".into());
             titles.push("Rescan".into());
             titles.push("Scan stats".into());
         }
@@ -271,7 +281,8 @@ impl InputHandler for App {
                 if let Some(entry) = self.files.as_ref().unwrap().get_selected() {
                     let mut path = self.files.as_ref().unwrap().current_path.clone();
                     path.join(entry.get_name().to_string());
-                    self.dialog = Some(Box::new(DeleteDialog::new(path, entry.get_size())))
+                    self.dialog = Some(Box::new(DeleteDialog::new(path, entry.get_size())));
+                    self.dialog_menu = Some(2);
                 }
             }
             'f' if self.files.is_some() => self.screen = Screen::Files,
@@ -279,12 +290,14 @@ impl InputHandler for App {
             'n' => {
                 self.dialog = Some(Box::new(NewScanDialog::new(
                     spacedisplay_lib::get_available_mounts(),
-                )))
+                )));
+                self.dialog_menu = Some(1);
             }
             'r' if self.screen == Screen::Files => self.files.as_mut().unwrap().rescan(true),
             'q' => self.should_quit = true,
             's' if self.screen == Screen::Files => {
-                self.dialog = Some(Box::new(ScanStatsDialog::new()))
+                self.dialog = Some(Box::new(ScanStatsDialog::new()));
+                self.dialog_menu = Some(4);
             }
             _ => {}
         }
