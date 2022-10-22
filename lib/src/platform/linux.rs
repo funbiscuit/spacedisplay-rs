@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use byte_unit::Byte;
+
 //todo can add more supported fs
 const SUPPORTED_FS: &[&str] = &["ext2", "ext3", "ext4", "vfat", "ntfs", "fuseblk"];
 
@@ -40,4 +42,10 @@ pub fn get_excluded_paths() -> Vec<PathBuf> {
     }
 
     excluded
+}
+
+pub fn get_used_memory() -> Option<Byte> {
+    let statm = procinfo::pid::statm_self().ok()?;
+    let bytes = statm.resident * page_size::get();
+    Some(Byte::from_bytes(bytes as u64))
 }

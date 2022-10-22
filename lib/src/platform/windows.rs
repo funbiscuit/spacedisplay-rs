@@ -1,11 +1,16 @@
-use crate::platform::MountStats;
-use byte_unit::Byte;
 use std::fs::Metadata;
+use std::mem::MaybeUninit;
 use std::os::windows::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+
+use byte_unit::Byte;
+
 use widestring::{U16CStr, U16CString};
 use windows_sys::Win32::Storage::FileSystem;
-use windows_sys::Win32::System::WindowsProgramming;
+use windows_sys::Win32::System::ProcessStatus::PROCESS_MEMORY_COUNTERS;
+use windows_sys::Win32::System::{ProcessStatus, WindowsProgramming};
+
+use crate::platform::MountStats;
 
 /// Returns all drives that can be scanned
 pub fn get_available_mounts() -> Vec<String> {
@@ -96,5 +101,29 @@ pub fn get_mount_stats<P: AsRef<Path>>(path: P) -> Option<MountStats> {
             available: Byte::from_bytes(free_bytes),
             total: Byte::from_bytes(total_bytes),
         })
+    }
+}
+
+pub fn get_used_memory() -> Option<Byte> {
+    // SAFETY: this call is always safe
+    let handle = unsafe { windows_sys::Win32::System::Threading::GetCurrentProcess() };
+    let mut counters = MaybeUninit::uninit();
+
+    // SAFETY: counters is pointer to uninit memory of necessary size
+    // it's okay for it to be uninit
+    let status = unsafe {
+        ProcessStatus::K32GetProcessMemoryInfo(
+            handle,
+            counters.as_mut_ptr(),
+            std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+        )
+    };
+
+    if status != 0 {
+        // SAFETY: previous call returned success value => uninit memory was initialized
+        let counters = unsafe { counters.assume_init() };
+        Some(Byte::from_bytes(counters.WorkingSetSize as u64))
+    } else {
+        None
     }
 }

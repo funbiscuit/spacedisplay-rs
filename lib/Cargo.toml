@@ -21,9 +21,12 @@ ptree = "0.4.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 inotify = "0.10.0"
+procinfo = "0.4.2"
+page_size = "0.4.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fsevent = "2.1.2"
+libproc = "0.12.0"
 
 [target.'cfg(unix)'.dependencies]
 proc-mounts = "0.3.0"
@@ -32,6 +35,6 @@ nix = "0.25.0"
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.42.0", features = [
     "Win32_Foundation", "Win32_Security", "Win32_Storage_FileSystem", "Win32_System_IO",
-    "Win32_System_WindowsProgramming"
+    "Win32_System_ProcessStatus", "Win32_System_Threading", "Win32_System_WindowsProgramming"
 ] }
 widestring = "1.0.2"

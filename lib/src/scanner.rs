@@ -21,6 +21,7 @@ pub struct ScanStats {
     pub files: u64,
     pub dirs: u64,
     pub scan_duration: Duration,
+    pub used_memory: Option<Byte>,
 }
 
 #[derive(Debug)]
@@ -130,26 +131,18 @@ impl Scanner {
         let scan_stats = self.state.tree.lock().unwrap().stats();
         let scan_duration =
             Duration::from_millis(self.state.scan_duration_ms.load(Ordering::SeqCst) as u64);
-        if let Some(mount_stats) = platform::get_mount_stats(self.root.get_path()) {
-            ScanStats {
-                used_size: scan_stats.used_size,
-                total_size: Some(mount_stats.total),
-                available_size: Some(mount_stats.available),
-                is_mount_point: mount_stats.is_mount_point,
-                files: scan_stats.files,
-                dirs: scan_stats.dirs,
-                scan_duration,
-            }
-        } else {
-            ScanStats {
-                used_size: scan_stats.used_size,
-                total_size: None,
-                available_size: None,
-                is_mount_point: false,
-                files: scan_stats.files,
-                dirs: scan_stats.dirs,
-                scan_duration,
-            }
+        let (total, available, is_mount) = platform::get_mount_stats(self.root.get_path())
+            .map(|s| (Some(s.total), Some(s.available), s.is_mount_point))
+            .unwrap_or((None, None, false));
+        ScanStats {
+            used_size: scan_stats.used_size,
+            total_size: total,
+            available_size: available,
+            is_mount_point: is_mount,
+            files: scan_stats.files,
+            dirs: scan_stats.dirs,
+            scan_duration,
+            used_memory: platform::get_used_memory(),
         }
     }
 

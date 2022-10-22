@@ -64,6 +64,9 @@ impl ScanStatsDialog {
         lines.push(files);
         lines.push(dirs);
         lines.push(format!("Scan took: {:?}", stats.scan_duration));
+        if let Some(memory) = stats.used_memory {
+            lines.push(format!("Memory usage: {}", utils::byte_to_str(memory, 0)));
+        }
 
         lines
     }
