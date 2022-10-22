@@ -13,7 +13,7 @@ use crate::file_list::{FileList, FileListItem};
 use crate::progressbar::{BarItem, ProgressBar};
 use crate::utils;
 
-pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
+pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App, simple_graphics: bool) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(1), Constraint::Min(10)].as_ref())
@@ -23,9 +23,12 @@ pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App) {
 
     match app.screen {
         Screen::Help => render_controls(frame, chunks[1]),
-        Screen::Files if app.files.is_some() => {
-            render_files(frame, chunks[1], app.files.as_mut().unwrap())
-        }
+        Screen::Files if app.files.is_some() => render_files(
+            frame,
+            chunks[1],
+            app.files.as_mut().unwrap(),
+            simple_graphics,
+        ),
         _ => {}
     }
 
@@ -80,13 +83,18 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
     frame.render_widget(home, rect);
 }
 
-fn render_files(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut FilesApp) {
+fn render_files(
+    frame: &mut Frame<impl Backend>,
+    rect: Rect,
+    app: &mut FilesApp,
+    simple_graphics: bool,
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(10), Constraint::Length(1)].as_ref())
         .split(rect);
 
-    let list = create_files_list(app);
+    let list = create_files_list(app, simple_graphics);
     let progressbar = create_progressbar(app);
 
     frame.render_stateful_widget(list, chunks[0], &mut app.file_list_state);
@@ -122,7 +130,7 @@ fn render_menu(frame: &mut Frame<impl Backend>, rect: Rect, app: &App) {
     frame.render_widget(tabs, rect);
 }
 
-fn create_files_list(app: &mut FilesApp) -> FileList<'static> {
+fn create_files_list(app: &mut FilesApp, simple_graphics: bool) -> FileList<'static> {
     let tree = app
         .scanner
         .get_tree(
@@ -152,6 +160,7 @@ fn create_files_list(app: &mut FilesApp) -> FileList<'static> {
         .collect();
 
     let list = FileList::new(items)
+        .simple_graphics(simple_graphics)
         .block(
             Block::default()
                 .borders(Borders::ALL)

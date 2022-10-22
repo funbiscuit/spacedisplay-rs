@@ -31,21 +31,24 @@ pub trait InputProvider {
 struct AppRunner<'a, B: Backend> {
     terminal: &'a mut Terminal<B>,
     tick_rate: Duration,
+    simple_graphics: bool,
     last_tick: Instant,
 }
 
 impl<'a, B: Backend> AppRunner<'a, B> {
-    fn new(terminal: &'a mut Terminal<B>, tick_rate: Duration) -> Self {
+    fn new(terminal: &'a mut Terminal<B>, tick_rate: Duration, simple_graphics: bool) -> Self {
         Self {
             terminal,
             tick_rate,
+            simple_graphics,
             last_tick: Instant::now(),
         }
     }
 
     fn run(mut self, mut app: App) -> Result<()> {
         loop {
-            self.terminal.draw(|f| ui::draw(f, &mut app))?;
+            self.terminal
+                .draw(|f| ui::draw(f, &mut app, self.simple_graphics))?;
 
             app.check_input(&self);
             if self.last_tick.elapsed() >= self.tick_rate {
@@ -94,7 +97,7 @@ pub fn run(args: Args) -> Result<()> {
     }));
 
     let mut terminal = init_terminal()?;
-    let runner = AppRunner::new(&mut terminal, args.tick_rate);
+    let runner = AppRunner::new(&mut terminal, args.tick_rate, args.simple_graphics);
     let mut app = App::new();
     if let Some(path) = args.path {
         app.start_scan(path);

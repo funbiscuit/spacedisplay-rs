@@ -17,6 +17,10 @@ pub struct Args {
     /// Path to directory to scan
     path: Option<String>,
 
+    /// Use simple graphics instead of unicode
+    #[arg(short, long)]
+    simple_graphics: bool,
+
     /// Refresh rate of terminal UI
     #[arg(short, long, value_parser(parse_duration), default_value("200"))]
     tick_rate: Duration,

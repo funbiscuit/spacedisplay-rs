@@ -58,9 +58,11 @@ pub struct FileList<'a> {
     block: Option<Block<'a>>,
     items: Vec<FileListItem>,
     highlight_style: Style,
+    simple_graphics: bool,
 }
 
 const SPINNER: [char; 10] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+const SPINNER_SIMPLE: [char; 4] = ['/', '-', '\\', '|'];
 
 impl<'a> FileList<'a> {
     pub fn new<T>(items: T) -> FileList<'a>
@@ -71,6 +73,7 @@ impl<'a> FileList<'a> {
             block: None,
             items: items.into(),
             highlight_style: Style::default(),
+            simple_graphics: false,
         }
     }
 
@@ -81,6 +84,11 @@ impl<'a> FileList<'a> {
 
     pub fn highlight_style(mut self, style: Style) -> FileList<'a> {
         self.highlight_style = style;
+        self
+    }
+
+    pub fn simple_graphics(mut self, simple_graphics: bool) -> FileList<'a> {
+        self.simple_graphics = simple_graphics;
         self
     }
 
@@ -151,7 +159,12 @@ impl<'a> StatefulWidget for FileList<'a> {
         state.offset = start;
 
         let highlight_symbol = " > ";
-        let busy_symbol = SPINNER[state.spinner_state].to_string();
+        let spinner = if self.simple_graphics {
+            &SPINNER_SIMPLE[..]
+        } else {
+            &SPINNER[..]
+        };
+        let busy_symbol = spinner[state.spinner_state].to_string();
         let blank_symbol = " ".repeat(3);
         // space between elements
         let spaces = 5;
@@ -214,25 +227,34 @@ impl<'a> StatefulWidget for FileList<'a> {
             let size_full = size as u64;
             let size_frac = size - size_full as f64;
 
-            buf.set_string(
-                elem_x + max_name_width + 3,
-                y,
-                " ".repeat(size_full as usize),
-                Style::default().bg(Color::LightYellow),
-            );
+            if self.simple_graphics {
+                buf.set_string(
+                    elem_x + max_name_width + 3,
+                    y,
+                    " ".repeat(size_full as usize),
+                    Style::default().bg(Color::LightYellow),
+                );
+            } else {
+                let mut str = utils::get_unicode_block(1.0).repeat(size_full as usize);
+                str.push_str(utils::get_unicode_block(size_frac));
 
-            let mut str = utils::get_unicode_block(size_frac).to_string();
-            str.push(' ');
-            str.push_str(&size_str);
+                buf.set_string(
+                    elem_x + max_name_width + 3,
+                    y,
+                    str,
+                    Style::default().fg(Color::LightYellow),
+                );
+            }
+
             buf.set_string(
-                elem_x + max_name_width + 3 + size_full as u16,
+                elem_x + max_name_width + 5 + size_full as u16,
                 y,
-                &str,
+                &size_str,
                 Style::default().fg(Color::LightYellow),
             );
         }
 
-        state.spinner_state = (state.spinner_state + 1) % SPINNER.len();
+        state.spinner_state = (state.spinner_state + 1) % spinner.len();
     }
 }
 
