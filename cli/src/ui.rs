@@ -58,6 +58,7 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
         Spans::from(vec![Span::raw(
             "'Enter' or 'Right' to open selected directory",
         )]),
+        Spans::from(vec![Span::raw("'D' to delete files")]),
         Spans::from(vec![Span::raw(
             "'Esc', 'Backspace' or 'Left' to navigate up",
         )]),
