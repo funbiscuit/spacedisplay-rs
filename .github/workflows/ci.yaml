@@ -14,13 +14,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        run: |
+          rustup override set stable
+          rustup update stable
+          rustup component add rustfmt clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Check and Test
         run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
 
@@ -28,7 +27,7 @@ jobs:
         run: cargo build --release
 
       - name: Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-amd64_linux
           path: ${{github.workspace}}/target/release/spacedisplay-cli
@@ -41,13 +40,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        run: |
+          rustup override set stable
+          rustup update stable
+          rustup component add rustfmt clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Check and Test
         run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
 
@@ -55,7 +53,7 @@ jobs:
         run: cargo build --release
 
       - name: Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-macos
           path: ${{github.workspace}}/target/release/spacedisplay-cli
@@ -67,13 +65,12 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+        run: |
+          rustup override set stable
+          rustup update stable
+          rustup component add rustfmt clippy
 
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: Check and Test
         run: cargo fmt -- --check && cargo clippy -- -Dwarnings && cargo test
 
@@ -81,7 +78,7 @@ jobs:
         run: cargo build --release
 
       - name: Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-win64
           path: ${{github.workspace}}/target/release/spacedisplay-cli.exe
