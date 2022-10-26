@@ -17,6 +17,7 @@ spacedisplay-lib = { path = "../lib", version = "0.2.0" }
 
 anyhow = "1.0"
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
+chrono = "0.4.22"
 clap = { version = "4.0.18", features = ["derive"] }
 crossterm = { version = "0.25", features = ["serde"] }
 derivative = "2.2.0"

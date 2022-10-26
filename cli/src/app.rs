@@ -1,17 +1,69 @@
+use std::sync::Arc;
+
 use derivative::Derivative;
 
 use spacedisplay_lib::{
-    EntryPath, EntrySnapshot, EntrySnapshotRef, ScanStats, Scanner, SnapshotConfig, TreeSnapshot,
+    EntryPath, EntrySnapshot, EntrySnapshotRef, LogEntry, Logger, ScanStats, Scanner,
+    ScannerBuilder, SnapshotConfig, TreeSnapshot,
 };
 
 use crate::dialog::{DeleteDialog, Dialog, NewScanDialog, ScanStatsDialog};
 use crate::file_list::FileListState;
+use crate::log_list::LogListState;
 use crate::term::{InputHandler, InputProvider};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Screen {
     Help,
     Files,
+    Log,
+}
+
+#[derive(Debug)]
+pub struct LogsApp {
+    pub logger: Arc<Logger>,
+    pub entries: Vec<LogEntry>,
+    pub list_state: LogListState,
+}
+
+impl LogsApp {
+    fn new(logger: Arc<Logger>) -> Self {
+        Self {
+            logger,
+            entries: vec![],
+            list_state: LogListState::default(),
+        }
+    }
+
+    fn on_tick(&mut self) {
+        self.entries.extend(self.logger.read_entries());
+    }
+}
+
+impl InputHandler for LogsApp {
+    fn on_down(&mut self) {
+        self.list_state.move_down();
+    }
+
+    fn on_end(&mut self) {
+        self.list_state.set_follow(true);
+    }
+
+    fn on_home(&mut self) {
+        self.list_state.move_home();
+    }
+
+    fn on_page_down(&mut self) {
+        self.list_state.page_down();
+    }
+
+    fn on_page_up(&mut self) {
+        self.list_state.page_up();
+    }
+
+    fn on_up(&mut self) {
+        self.list_state.move_up();
+    }
 }
 
 #[derive(Debug)]
@@ -22,11 +74,14 @@ pub struct FilesApp {
     pub path_history: Vec<String>,
     pub snapshot: Option<TreeSnapshot<EntrySnapshot>>,
     pub stats: ScanStats,
+    pub logger: Arc<Logger>,
 }
 
 impl FilesApp {
-    pub fn new_scan(path: String) -> Self {
-        let scanner = Scanner::new(path);
+    pub fn new_scan(path: String, logger: Arc<Logger>) -> Self {
+        let scanner = ScannerBuilder::default()
+            .logger(Arc::clone(&logger))
+            .scan(path);
         let file_list_state = FileListState::default();
         let current_path = scanner.get_scan_path().clone();
         let stats = scanner.stats();
@@ -37,6 +92,7 @@ impl FilesApp {
             path_history: vec![],
             snapshot: None,
             stats,
+            logger,
         }
     }
 
@@ -179,16 +235,21 @@ pub struct App {
     pub dialog: Option<Box<dyn Dialog>>,
     pub dialog_menu: Option<usize>,
     pub should_quit: bool,
+    pub logger: Arc<Logger>,
+    pub logs_app: LogsApp,
 }
 
 impl App {
     pub fn new() -> Self {
+        let logger = Arc::new(Logger::default());
         App {
             files: None,
             screen: Screen::Help,
             dialog: None,
             dialog_menu: None,
             should_quit: false,
+            logger: Arc::clone(&logger),
+            logs_app: LogsApp::new(logger),
         }
     }
 
@@ -206,6 +267,7 @@ impl App {
     }
 
     pub fn on_tick(&mut self) {
+        self.logs_app.on_tick();
         self.files.as_mut().map(FilesApp::update_snapshot);
     }
 
@@ -218,12 +280,13 @@ impl App {
             match self.screen {
                 Screen::Files => 0,
                 Screen::Help => add,
+                Screen::Log => add + 2,
             }
         }
     }
 
     pub fn start_scan(&mut self, path: String) {
-        self.files = Some(FilesApp::new_scan(path));
+        self.files = Some(FilesApp::new_scan(path, Arc::clone(&self.logger)));
         self.screen = Screen::Files;
     }
 
@@ -239,6 +302,7 @@ impl App {
             titles.push("Rescan".into());
             titles.push("Scan stats".into());
         }
+        titles.push("Log".into());
         titles.push("Quit".into());
         titles
     }
@@ -254,6 +318,15 @@ impl InputHandler for App {
     fn on_down(&mut self) {
         if self.screen == Screen::Files {
             self.files.as_mut().map(FilesApp::select_down);
+        } else if self.screen == Screen::Log {
+            //todo refactor input handler so there is no if-else
+            self.logs_app.on_down();
+        }
+    }
+
+    fn on_end(&mut self) {
+        if self.screen == Screen::Log {
+            self.logs_app.on_end();
         }
     }
 
@@ -275,6 +348,12 @@ impl InputHandler for App {
         }
     }
 
+    fn on_home(&mut self) {
+        if self.screen == Screen::Log {
+            self.logs_app.on_home();
+        }
+    }
+
     fn on_key(&mut self, c: char) {
         match c {
             'd' if self.screen == Screen::Files => {
@@ -287,6 +366,13 @@ impl InputHandler for App {
             }
             'f' if self.files.is_some() => self.screen = Screen::Files,
             'h' => self.screen = Screen::Help,
+            'l' => {
+                // follow only if log screen was not opened yet
+                self.logs_app
+                    .list_state
+                    .set_follow(self.screen != Screen::Log);
+                self.screen = Screen::Log;
+            }
             'n' => {
                 self.dialog = Some(Box::new(NewScanDialog::new(
                     spacedisplay_lib::get_available_mounts(),
@@ -307,6 +393,18 @@ impl InputHandler for App {
         self.on_backspace();
     }
 
+    fn on_page_down(&mut self) {
+        if self.screen == Screen::Log {
+            self.logs_app.on_page_down();
+        }
+    }
+
+    fn on_page_up(&mut self) {
+        if self.screen == Screen::Log {
+            self.logs_app.on_page_up();
+        }
+    }
+
     fn on_right(&mut self) {
         self.on_enter();
     }
@@ -314,6 +412,8 @@ impl InputHandler for App {
     fn on_up(&mut self) {
         if self.screen == Screen::Files {
             self.files.as_mut().map(FilesApp::select_up);
+        } else if self.screen == Screen::Log {
+            self.logs_app.on_up();
         }
     }
 }

@@ -10,6 +10,7 @@ use spacedisplay_lib::SnapshotConfig;
 
 use crate::app::{App, FilesApp, Screen};
 use crate::file_list::{FileList, FileListItem};
+use crate::log_list::LogList;
 use crate::progressbar::{BarItem, ProgressBar};
 use crate::utils;
 
@@ -29,6 +30,7 @@ pub fn draw(frame: &mut Frame<impl Backend>, app: &mut App, simple_graphics: boo
             app.files.as_mut().unwrap(),
             simple_graphics,
         ),
+        Screen::Log => render_log(frame, chunks[1], app),
         _ => {}
     }
 
@@ -100,6 +102,12 @@ fn render_files(
 
     frame.render_stateful_widget(list, chunks[0], &mut app.file_list_state);
     frame.render_widget(progressbar, chunks[1]);
+}
+
+fn render_log(frame: &mut Frame<impl Backend>, rect: Rect, app: &mut App) {
+    let list = LogList::new(&app.logs_app.entries)
+        .block(Block::default().title("Logs").borders(Borders::ALL));
+    frame.render_stateful_widget(list, rect, &mut app.logs_app.list_state);
 }
 
 fn render_menu(frame: &mut Frame<impl Backend>, rect: Rect, app: &App) {

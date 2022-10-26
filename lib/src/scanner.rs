@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use byte_unit::Byte;
 
 use crate::entry::FileEntry;
+use crate::logger::Logger;
 use crate::tree::FileTree;
 use crate::watcher::Watcher;
 use crate::{platform, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
@@ -35,6 +36,8 @@ struct ScanState {
     scan_flag: AtomicBool,
 
     scan_duration_ms: AtomicU32,
+
+    logger: Option<Arc<Logger>>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -42,6 +45,22 @@ struct ScanTask {
     path: EntryPath,
     reset_stopwatch: bool,
     recursive: bool,
+}
+
+#[derive(Debug, Default)]
+pub struct ScannerBuilder {
+    logger: Option<Arc<Logger>>,
+}
+
+impl ScannerBuilder {
+    pub fn logger(mut self, logger: Arc<Logger>) -> Self {
+        self.logger = Some(logger);
+        self
+    }
+
+    pub fn scan(self, path: String) -> Scanner {
+        Scanner::new(path, self.logger)
+    }
 }
 
 #[derive(Debug)]
@@ -87,34 +106,6 @@ impl Scanner {
 
     pub fn is_scanning(&self) -> bool {
         self.state.is_scanning.load(Ordering::SeqCst)
-    }
-
-    pub fn new(path: String) -> Self {
-        let tree = FileTree::new(path.clone());
-        let root = tree.get_root().get_path(tree.get_arena());
-        let (tx, rx) = std::sync::mpsc::channel();
-        tx.send(ScanTask {
-            path: root.clone(),
-            reset_stopwatch: true,
-            recursive: true,
-        })
-        .unwrap();
-        let state = Arc::new(ScanState {
-            tree: Mutex::new(tree),
-            current_path: Mutex::new(None),
-            is_scanning: AtomicBool::new(false),
-            scan_flag: AtomicBool::new(true),
-            scan_duration_ms: AtomicU32::new(0),
-        });
-
-        let scan_handle = Scanner::start_scan(path, Arc::clone(&state), rx);
-
-        Scanner {
-            root,
-            state,
-            tx,
-            scan_handle: Some(scan_handle),
-        }
     }
 
     pub fn rescan_path(&self, path: EntryPath, reset_stopwatch: bool) {
@@ -177,11 +168,37 @@ impl Scanner {
         queue.push(task);
     }
 
+    fn new(path: String, logger: Option<Arc<Logger>>) -> Self {
+        let tree = FileTree::new(path.clone());
+        let root = tree.get_root().get_path(tree.get_arena());
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(ScanTask {
+            path: root.clone(),
+            reset_stopwatch: true,
+            recursive: true,
+        })
+        .unwrap();
+        let state = Arc::new(ScanState {
+            tree: Mutex::new(tree),
+            current_path: Mutex::new(None),
+            is_scanning: AtomicBool::new(false),
+            scan_flag: AtomicBool::new(true),
+            scan_duration_ms: AtomicU32::new(0),
+            logger,
+        });
+
+        let scan_handle = Scanner::start_scan(path, Arc::clone(&state), rx);
+
+        Scanner {
+            root,
+            state,
+            tx,
+            scan_handle: Some(scan_handle),
+        }
+    }
+
     fn start_scan(root: String, state: Arc<ScanState>, rx: Receiver<ScanTask>) -> JoinHandle<()> {
         thread::spawn(move || {
-            // todo logging
-            // println!("background scanner started");
-
             let mut watcher = crate::watcher::new_watcher(root.clone());
 
             let mut start = Instant::now();
@@ -190,6 +207,7 @@ impl Scanner {
             let mut children = vec![];
 
             let excluded = platform::get_excluded_paths();
+            let log = |msg| state.logger.as_ref().map(|l| l.log(msg));
 
             while state.scan_flag.load(Ordering::SeqCst) {
                 while state.scan_flag.load(Ordering::SeqCst) {
@@ -211,6 +229,7 @@ impl Scanner {
                     // add all tasks to queue
                     for task in rx.try_iter() {
                         if task.reset_stopwatch && !state.is_scanning.load(Ordering::SeqCst) {
+                            log("Start scan".to_string());
                             start = Instant::now();
                             state.is_scanning.store(true, Ordering::SeqCst);
                         }
@@ -231,7 +250,10 @@ impl Scanner {
                         .replace(task.path.clone());
                     let entries: Vec<_> = std::fs::read_dir(&task.path.get_path())
                         .and_then(|dir| dir.collect::<Result<_, _>>())
-                        .unwrap_or_default();
+                        .unwrap_or_else(|_| {
+                            log(format!("Unable to scan {}", task.path));
+                            vec![]
+                        });
 
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
@@ -256,6 +278,8 @@ impl Scanner {
                                 size,
                                 metadata.is_dir() && !metadata.is_symlink(),
                             ));
+                        } else {
+                            log(format!("Unable to get metadata for {:?}", entry.path()));
                         }
                     }
                     let new_dirs = {
@@ -279,9 +303,17 @@ impl Scanner {
                     children = vec![];
                 }
                 if state.is_scanning.load(Ordering::SeqCst) {
-                    state
-                        .scan_duration_ms
-                        .store(start.elapsed().as_millis() as u32, Ordering::SeqCst);
+                    let duration = start.elapsed().as_millis() as u32;
+                    state.scan_duration_ms.store(duration, Ordering::SeqCst);
+                    if queue.is_empty() {
+                        let stats = state.tree.lock().unwrap().stats();
+                        log(format!(
+                            "Scan finished: {} files {} dirs in {:?}",
+                            stats.files,
+                            stats.dirs,
+                            Duration::from_millis(duration as u64)
+                        ));
+                    }
                 }
                 if queue.is_empty() {
                     state.is_scanning.store(false, Ordering::SeqCst);

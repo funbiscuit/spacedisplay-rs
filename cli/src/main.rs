@@ -6,6 +6,7 @@ use clap::Parser;
 mod app;
 mod dialog;
 mod file_list;
+mod log_list;
 mod progressbar;
 mod term;
 mod ui;

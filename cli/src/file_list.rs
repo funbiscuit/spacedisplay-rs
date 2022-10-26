@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp;
 
 use byte_unit::Byte;
 use tui::buffer::Buffer;
@@ -99,33 +99,23 @@ impl<'a> FileList<'a> {
         max_height: usize,
     ) -> (usize, usize) {
         let offset = offset.min(self.items.len().saturating_sub(1));
+        let mut height = max_height.min(self.items.len().saturating_sub(offset));
         let mut start = offset;
-        let mut end = offset;
-        let mut height = 0;
-        //todo simplify
-        for _ in self.items.iter().skip(offset) {
-            if height + 1 > max_height {
-                break;
-            }
-            height += 1;
-            end += 1;
-        }
+        let mut end = offset + height;
 
         let selected = selected.min(self.items.len() - 1);
-        while selected >= end {
-            height = height.saturating_add(1);
-            end += 1;
-            while height > max_height {
-                height = height.saturating_sub(1);
-                start += 1;
+        // if selection is not in bounds, adjust bounds
+        if selected >= end {
+            height += selected + 1 - end;
+            end = selected + 1;
+            if height > max_height {
+                start += height - max_height;
             }
-        }
-        while selected < start {
-            start -= 1;
-            height = height.saturating_add(1);
-            while height > max_height {
-                end -= 1;
-                height = height.saturating_sub(1);
+        } else if selected < start {
+            height += start - selected;
+            start = selected;
+            if height > max_height {
+                end -= height - max_height;
             }
         }
         (start, end)
@@ -197,7 +187,7 @@ impl<'a> StatefulWidget for FileList<'a> {
             } else {
                 &blank_symbol
             };
-            let max_name_width = min(30, list_area.width);
+            let max_name_width = cmp::min(30, list_area.width);
             let (elem_x, max_name_width) = {
                 let (elem_x, _) =
                     buf.set_stringn(x, y, symbol, max_name_width as usize, item_style);

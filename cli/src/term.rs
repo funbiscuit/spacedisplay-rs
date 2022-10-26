@@ -15,11 +15,15 @@ use crate::{ui, Args};
 pub trait InputHandler {
     fn on_backspace(&mut self) {}
     fn on_down(&mut self) {}
+    fn on_end(&mut self) {}
     fn on_enter(&mut self) {}
     fn on_esc(&mut self) {}
     fn on_fn(&mut self, _n: u8) {}
+    fn on_home(&mut self) {}
     fn on_key(&mut self, _c: char) {}
     fn on_left(&mut self) {}
+    fn on_page_down(&mut self) {}
+    fn on_page_up(&mut self) {}
     fn on_right(&mut self) {}
     fn on_up(&mut self) {}
 }
@@ -80,6 +84,10 @@ impl<'a, B: Backend> InputProvider for AppRunner<'a, B> {
                     KeyCode::Esc => handler.on_esc(),
                     KeyCode::Backspace => handler.on_esc(),
                     KeyCode::F(n) => handler.on_fn(n),
+                    KeyCode::PageDown => handler.on_page_down(),
+                    KeyCode::PageUp => handler.on_page_up(),
+                    KeyCode::End => handler.on_end(),
+                    KeyCode::Home => handler.on_home(),
                     _ => {}
                 }
             }

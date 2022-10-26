@@ -14,6 +14,7 @@ edition = "2021"
 
 [dependencies]
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
+chrono = "0.4.22"
 crc = "3.0.0"
 derivative = "2.2.0"
 mountpoints = "0.2.1"
