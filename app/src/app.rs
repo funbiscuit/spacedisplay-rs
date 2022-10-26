@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use derivative::Derivative;
 
-use spacedisplay_lib::{
+use diskscan::{
     EntryPath, EntrySnapshot, EntrySnapshotRef, LogEntry, Logger, ScanStats, Scanner,
     ScannerBuilder, SnapshotConfig, TreeSnapshot,
 };
@@ -375,7 +375,7 @@ impl InputHandler for App {
             }
             'n' => {
                 self.dialog = Some(Box::new(NewScanDialog::new(
-                    spacedisplay_lib::get_available_mounts(),
+                    diskscan::get_available_mounts(),
                 )));
                 self.dialog_menu = Some(1);
             }

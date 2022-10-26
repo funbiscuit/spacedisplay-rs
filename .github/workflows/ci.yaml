@@ -30,7 +30,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-amd64_linux
-          path: ${{github.workspace}}/target/release/spacedisplay-cli
+          path: ${{github.workspace}}/target/release/spacedisplay
 
   build-macos:
     runs-on: macos-11
@@ -56,7 +56,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-macos
-          path: ${{github.workspace}}/target/release/spacedisplay-cli
+          path: ${{github.workspace}}/target/release/spacedisplay
 
   build-win:
     runs-on: windows-2019
@@ -81,7 +81,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: spacedisplay-win64
-          path: ${{github.workspace}}/target/release/spacedisplay-cli.exe
+          path: ${{github.workspace}}/target/release/spacedisplay.exe
 
   add-release-assets:
     runs-on: ubuntu-latest
@@ -99,7 +99,7 @@ jobs:
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifacts/spacedisplay-win64/spacedisplay-cli.exe
+          file: artifacts/spacedisplay-win64/spacedisplay.exe
           tag: ${{ github.ref }}
           asset_name: spacedisplay-win64.exe
           overwrite: true
@@ -107,7 +107,7 @@ jobs:
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifacts/spacedisplay-amd64_linux/spacedisplay-cli
+          file: artifacts/spacedisplay-amd64_linux/spacedisplay
           tag: ${{ github.ref }}
           asset_name: spacedisplay-amd64_linux
           overwrite: true
@@ -115,7 +115,7 @@ jobs:
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: artifacts/spacedisplay-macos/spacedisplay-cli
+          file: artifacts/spacedisplay-macos/spacedisplay
           tag: ${{ github.ref }}
           asset_name: spacedisplay-macos
           overwrite: true

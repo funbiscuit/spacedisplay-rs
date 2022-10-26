@@ -5,7 +5,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, BorderType, Borders, Clear, Widget};
 use unicode_width::UnicodeWidthStr;
 
-use spacedisplay_lib::ScanStats;
+use diskscan::ScanStats;
 
 use crate::app::App;
 use crate::dialog::{Dialog, DialogWidget};

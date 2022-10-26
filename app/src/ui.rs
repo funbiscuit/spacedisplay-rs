@@ -6,7 +6,7 @@ use tui::text::{Span, Spans};
 use tui::widgets::{Block, BorderType, Borders, Paragraph, Tabs};
 use tui::Frame;
 
-use spacedisplay_lib::SnapshotConfig;
+use diskscan::SnapshotConfig;
 
 use crate::app::{App, FilesApp, Screen};
 use crate::file_list::{FileList, FileListItem};
@@ -47,7 +47,7 @@ fn render_controls(frame: &mut Frame<impl Backend>, rect: Rect) {
     let lines = vec![
         Spans::from(vec![Span::raw("Welcome to")]),
         Spans::from(vec![Span::styled(
-            "spacedisplay-cli",
+            "spacedisplay",
             Style::default().fg(Color::LightYellow),
         )]),
         Spans::from(vec![Span::raw("")]),

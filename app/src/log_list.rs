@@ -4,7 +4,7 @@ use tui::style::{Color, Style};
 use tui::widgets::{Block, StatefulWidget, Widget};
 use unicode_width::UnicodeWidthStr;
 
-use spacedisplay_lib::LogEntry;
+use diskscan::LogEntry;
 
 #[derive(Debug, Clone, Default)]
 pub struct LogListState {

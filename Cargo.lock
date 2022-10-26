@@ -349,6 +349,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "diskscan"
+version = "0.2.0"
+dependencies = [
+ "byte-unit",
+ "chrono",
+ "crc",
+ "derivative",
+ "fsevent",
+ "inotify",
+ "libproc",
+ "mountpoints",
+ "nix",
+ "page_size",
+ "proc-mounts",
+ "procinfo",
+ "ptree",
+ "widestring",
+ "windows-sys 0.42.0",
+]
+
+[[package]]
 name = "errno"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1096,7 +1117,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "spacedisplay-cli"
+name = "spacedisplay"
 version = "0.2.0"
 dependencies = [
  "anyhow",
@@ -1105,31 +1126,10 @@ dependencies = [
  "clap",
  "crossterm",
  "derivative",
+ "diskscan",
  "num-format",
- "spacedisplay-lib",
  "tui",
  "unicode-width",
-]
-
-[[package]]
-name = "spacedisplay-lib"
-version = "0.2.0"
-dependencies = [
- "byte-unit",
- "chrono",
- "crc",
- "derivative",
- "fsevent",
- "inotify",
- "libproc",
- "mountpoints",
- "nix",
- "page_size",
- "proc-mounts",
- "procinfo",
- "ptree",
- "widestring",
- "windows-sys 0.42.0",
 ]
 
 [[package]]

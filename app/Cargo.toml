@@ -1,5 +1,5 @@
 [package]
-name = "spacedisplay-cli"
+name = "spacedisplay"
 version = "0.2.0"
 authors = ["Sviatoslav Kokurin <kokurinsv@gmail.com>"]
 description = """
@@ -7,13 +7,13 @@ Fast and lightweight tool to scan your disk space.
 """
 repository = "https://github.com/funbiscuit/spacedisplay-rs"
 readme = "../README.md"
-keywords = ["cli", "terminal", "disk", "scan"]
+keywords = ["terminal", "disk", "scan"]
 license = "MIT"
-categories = ["command-line-interface", "command-line-utilities", "filesystem"]
+categories = ["command-line-utilities", "filesystem"]
 edition = "2021"
 
 [dependencies]
-spacedisplay-lib = { path = "../lib", version = "0.2.0" }
+diskscan = { path = "../lib", version = "0.2.0" }
 
 anyhow = "1.0"
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }

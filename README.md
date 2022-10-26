@@ -23,10 +23,10 @@ Check out [GitHub Releases](https://github.com/funbiscuit/spacedisplay-rs/releas
 
 ### Cargo
 
-You can install `spacedisplay-cli` using cargo:
+You can install `spacedisplay` using cargo:
 
 ```shell
-cargo install spacedisplay-cli
+cargo install spacedisplay
 ```
 
 ## Basic usage
