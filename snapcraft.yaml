@@ -1,0 +1,25 @@
+name: spacedisplay
+version: '0.2.0'
+summary: Fast and lightweight tool to scan your disk space.
+description: |
+  spacedisplay is a terminal app that allow you
+  to scan filesystem and analyze used space.
+grade: stable
+confinement: classic
+base: core20
+
+parts:
+  spacedisplay:
+    plugin: rust
+    override-pull: |
+      cp -rf /root/project/app app
+      cp -rf /root/project/lib lib
+      cp -f /root/project/Cargo.lock app/Cargo.lock
+      cp -f /root/project/Cargo.lock lib/Cargo.lock
+    source: .
+    rust-path:
+      - app
+
+apps:
+  spacedisplay:
+    command: bin/spacedisplay

@@ -32,6 +32,25 @@ jobs:
           name: spacedisplay-amd64_linux
           path: ${{github.workspace}}/target/release/spacedisplay
 
+  build-linux-snap:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Build snap
+        uses: snapcore/action-build@v1
+        id: snapcraft
+
+      - name: Rename built snap
+        run: mv ${{ steps.snapcraft.outputs.snap }} spacedisplay-amd64.snap
+
+      - name: Upload snap
+        uses: actions/upload-artifact@v3
+        with:
+          name: spacedisplay-amd64-snap
+          path: ${{github.workspace}}/spacedisplay-amd64.snap
+
   build-macos:
     runs-on: macos-11
 
@@ -86,7 +105,7 @@ jobs:
   add-release-assets:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
-    needs: [ build-win, build-linux, build-macos ]
+    needs: [ build-win, build-linux, build-linux-snap, build-macos ]
     steps:
       - uses: actions/download-artifact@v2
         with:
@@ -110,6 +129,14 @@ jobs:
           file: artifacts/spacedisplay-amd64_linux/spacedisplay
           tag: ${{ github.ref }}
           asset_name: spacedisplay-amd64_linux
+          overwrite: true
+
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: artifacts/spacedisplay-amd64-snap/spacedisplay-amd64.snap
+          tag: ${{ github.ref }}
+          asset_name: spacedisplay-amd64_linux.snap
           overwrite: true
 
       - uses: svenstaro/upload-release-action@v2
