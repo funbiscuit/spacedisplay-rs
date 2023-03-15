@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -7,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use byte_unit::Byte;
 
-use crate::entry::FileEntry;
+use crate::entry::DirEntry;
 use crate::logger::Logger;
 use crate::tree::FileTree;
 use crate::watcher::Watcher;
@@ -88,20 +89,25 @@ impl Scanner {
         root: &EntryPath,
         config: SnapshotConfig,
     ) -> Option<TreeSnapshot<EntrySnapshot>> {
-        self.state.tree.lock().unwrap().make_snapshot(root, config)
+        self.state
+            .tree
+            .lock()
+            .unwrap()
+            .make_snapshot(root, config, &Scanner::retrieve_files)
     }
 
     pub fn get_tree_wrapped<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>>(
         &self,
         root: &EntryPath,
         config: SnapshotConfig,
-        wrapper: Box<dyn Fn(EntrySnapshot) -> W>,
+        wrapper: &dyn Fn(EntrySnapshot) -> W,
     ) -> Option<TreeSnapshot<W>> {
-        self.state
-            .tree
-            .lock()
-            .unwrap()
-            .make_snapshot_wrapped(root, config, wrapper)
+        self.state.tree.lock().unwrap().make_snapshot_wrapped(
+            root,
+            config,
+            wrapper,
+            &Scanner::retrieve_files,
+        )
     }
 
     pub fn is_scanning(&self) -> bool {
@@ -197,6 +203,29 @@ impl Scanner {
         }
     }
 
+    /// Retrieve list of all files and their sizes at specified path
+    /// Files are not sorted in any way
+    fn retrieve_files(path: &Path) -> Vec<(String, i64)> {
+        std::fs::read_dir(path)
+            .and_then(|rd| {
+                let mut files = vec![];
+                for f in rd {
+                    let f = f?;
+
+                    if let Ok(metadata) = f.metadata() {
+                        if !metadata.is_dir() || metadata.is_symlink() {
+                            let name = f.file_name().to_str().unwrap().to_string();
+                            let size = platform::get_file_size(&metadata) as i64;
+
+                            files.push((name, size))
+                        }
+                    }
+                }
+                Ok(files)
+            })
+            .unwrap_or_default()
+    }
+
     fn start_scan(root: String, state: Arc<ScanState>, rx: Receiver<ScanTask>) -> JoinHandle<()> {
         thread::spawn(move || {
             let mut watcher = crate::watcher::new_watcher(root.clone());
@@ -255,6 +284,8 @@ impl Scanner {
                             vec![]
                         });
 
+                    let mut file_count = 0;
+                    let mut files_size = 0;
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
                             let name = entry.file_name().to_str().unwrap().to_string();
@@ -272,19 +303,20 @@ impl Scanner {
                                 });
                             }
 
-                            let size = platform::get_file_size(&metadata) as i64;
-                            children.push(FileEntry::new(
-                                name,
-                                size,
-                                metadata.is_dir() && !metadata.is_symlink(),
-                            ));
+                            if metadata.is_dir() && !metadata.is_symlink() {
+                                // treat all directories as zero sized
+                                children.push(DirEntry::new_dir(name));
+                            } else {
+                                file_count += 1;
+                                files_size += platform::get_file_size(&metadata) as i64;
+                            }
                         } else {
                             log(format!("Unable to get metadata for {:?}", entry.path()));
                         }
                     }
                     let new_dirs = {
                         let mut tree = state.tree.lock().unwrap();
-                        tree.set_children(&task.path, children)
+                        tree.set_children(&task.path, children, file_count, files_size)
                     };
 
                     if let Some(new_dirs) = new_dirs {

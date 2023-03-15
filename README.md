@@ -2,13 +2,13 @@
 
 [![Build](https://github.com/funbiscuit/spacedisplay-rs/actions/workflows/ci.yaml/badge.svg?branch=master)](https://github.com/funbiscuit/spacedisplay-rs/actions/workflows/ci.yaml)
 
-Simple, cross-platform terminal app to scan and analyze used disk space
+Simple, cross-platform and lightweight terminal app to scan and analyze used disk space
 
 ![demo](images/demo.gif)
 
 ## Features
 
-* Fast scanning and low memory footprint (~150MB per 1M files)
+* Fast scanning and low memory footprint (~45MB per 1M files)
 * Delete files from app
 * File changes are detected so file system can be modified from outside. On Linux this is limited by inotify limits.
 * Rescan directories manually if file changes were not detected
@@ -69,4 +69,4 @@ In test above default file manager is Explorer on Windows, Dolphin in Kubuntu,
 Finder in macOS.
 
 spacedisplay is also lightweight in terms of memory usage.  
-To scan 700k files it uses ~100MB of RAM (measured in Kubuntu).
+To scan 1M files it uses only ~45MB of RAM (measured in Ubuntu 22.04).

@@ -1,5 +1,7 @@
+use std::path::Path;
+
 use crate::arena::{Arena, Id};
-use crate::entry::FileEntry;
+use crate::entry::DirEntry;
 use crate::entry_snapshot::EntrySnapshotRef;
 use crate::EntrySnapshot;
 
@@ -28,25 +30,15 @@ pub struct TreeSnapshot<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> {
     arena: Arena<W>,
 }
 
-impl TreeSnapshot<EntrySnapshot> {
-    pub fn create(
-        root: Id,
-        arena: &Arena<FileEntry>,
-        config: SnapshotConfig,
-    ) -> TreeSnapshot<EntrySnapshot> {
-        TreeSnapshot::create_wrapped(root, arena, config, Box::new(std::convert::identity))
-    }
-}
-
 impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
     pub fn create_wrapped(
         root: Id,
-        arena: &Arena<FileEntry>,
+        arena: &Arena<DirEntry>,
         config: SnapshotConfig,
-        wrapper: Box<dyn Fn(EntrySnapshot) -> W>,
+        wrapper: &dyn Fn(EntrySnapshot) -> W,
+        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
     ) -> Self {
         let entry = arena.get(root);
-        assert!(entry.is_dir(), "Snapshots can be created only for dirs");
         let mut snapshots = Arena::default();
 
         let root = snapshots.put_with_id(|id| {
@@ -62,7 +54,7 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
             arena: snapshots,
         };
 
-        tree.fill_snapshot(root, entry, arena, config, &wrapper);
+        tree.fill_snapshot(root, entry, arena, config, wrapper, files_getter);
 
         tree
     }
@@ -78,17 +70,18 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
     fn fill_snapshot(
         &mut self,
         id: Id,
-        entry: &FileEntry,
-        arena: &Arena<FileEntry>,
+        entry: &DirEntry,
+        arena: &Arena<DirEntry>,
         config: SnapshotConfig,
         wrapper: &dyn Fn(EntrySnapshot) -> W,
+        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
     ) {
         if config.max_depth == 0 {
             self.arena.get_mut(id).as_mut().set_children(vec![]);
             return;
         }
 
-        let children: Vec<_> = entry
+        let mut children: Vec<_> = entry
             .iter(arena)
             .take_while(|e| e.get_size() >= config.min_size as i64)
             .map(|e| {
@@ -100,28 +93,49 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
                     ))
                 });
 
-                if e.is_dir() {
-                    self.fill_snapshot(
-                        id,
-                        e,
-                        arena,
-                        SnapshotConfig {
-                            max_depth: config.max_depth - 1,
-                            ..config.clone()
-                        },
-                        wrapper,
-                    );
-                }
+                self.fill_snapshot(
+                    id,
+                    e,
+                    arena,
+                    SnapshotConfig {
+                        max_depth: config.max_depth - 1,
+                        ..config.clone()
+                    },
+                    wrapper,
+                    files_getter,
+                );
 
                 id
             })
             .collect();
+        let path = entry.get_path(arena).get_path();
+        // get files for this entry
+        let files = files_getter(&path);
+
+        children.extend(
+            files
+                .into_iter()
+                // files are not sorted by size, so using filter instead of takeWhile
+                .filter(|(_, size)| *size >= config.min_size as i64)
+                .map(|(name, size)| {
+                    self.arena
+                        .put_with_id(|id| wrapper(EntrySnapshot::new(id, name, size)))
+                }),
+        );
+        // need to sort after combining directories with files
+        children.sort_by(|&a, &b| {
+            let a = self.arena.get(a).as_ref();
+            let b = self.arena.get(b).as_ref();
+
+            b.get_size()
+                .cmp(&a.get_size())
+                .then_with(|| a.get_name().cmp(b.get_name()))
+        });
 
         for &child in &children {
             self.arena.get_mut(child).as_mut().set_parent(id);
         }
 
-        let snapshot = self.arena.get_mut(id).as_mut();
-        snapshot.set_children(children);
+        self.arena.get_mut(id).as_mut().set_children(children);
     }
 }

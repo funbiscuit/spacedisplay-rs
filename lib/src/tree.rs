@@ -1,9 +1,10 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use byte_unit::Byte;
 
 use crate::arena::{Arena, Id};
-use crate::entry::FileEntry;
+use crate::entry::DirEntry;
 use crate::path::{EntryPath, PathCrc};
 use crate::{EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
@@ -20,7 +21,7 @@ pub struct FileTree {
     root: Id,
 
     /// Arena where all entries are actually stored
-    arena: Arena<FileEntry>,
+    arena: Arena<DirEntry>,
 
     /// Map of all file entries
     ///
@@ -63,11 +64,11 @@ impl FileTree {
         }
     }
 
-    pub fn get_arena(&self) -> &Arena<FileEntry> {
+    pub fn get_arena(&self) -> &Arena<DirEntry> {
         &self.arena
     }
 
-    pub fn get_root(&self) -> &FileEntry {
+    pub fn get_root(&self) -> &DirEntry {
         self.arena.get(self.root)
     }
 
@@ -75,16 +76,17 @@ impl FileTree {
         &self,
         root: &EntryPath,
         config: SnapshotConfig,
+        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
     ) -> Option<TreeSnapshot<EntrySnapshot>> {
-        let root = self.find_entry(root)?;
-        Some(TreeSnapshot::create(root, &self.arena, config))
+        self.make_snapshot_wrapped(root, config, &std::convert::identity, files_getter)
     }
 
     pub fn make_snapshot_wrapped<W>(
         &self,
         root: &EntryPath,
         config: SnapshotConfig,
-        wrapper: Box<dyn Fn(EntrySnapshot) -> W>,
+        wrapper: &dyn Fn(EntrySnapshot) -> W,
+        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
     ) -> Option<TreeSnapshot<W>>
     where
         W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>,
@@ -95,6 +97,7 @@ impl FileTree {
             &self.arena,
             config,
             wrapper,
+            files_getter,
         ))
     }
 
@@ -102,7 +105,7 @@ impl FileTree {
     pub fn new(path: String) -> Self {
         let mut arena = Arena::default();
 
-        let root = arena.put(FileEntry::new_dir(path, 0));
+        let root = arena.put(DirEntry::new_dir(path));
         FileTree {
             root,
             arena,
@@ -114,61 +117,60 @@ impl FileTree {
 
     /// Sets children for specified path
     ///
-    /// All existing children at path, if not present in given vec, are removed (recursively)
+    /// All existing directories at path, if not present in given vec, are removed (recursively)
+    /// Updates number of files at given path and their total size
     /// All new directories are returned
     pub fn set_children(
         &mut self,
         path: &EntryPath,
-        children: Vec<FileEntry>,
+        directories: Vec<DirEntry>,
+        file_count: u64,
+        files_size: i64,
     ) -> Option<Vec<String>> {
         let parent_id = self.find_entry(path)?;
         //todo probably can increase speed by presorting children
         // and inserting them in bulk
         let mut new_dirs = vec![];
 
-        let (mut deleted_dirs, mut deleted_files) =
-            FileEntry::mark_children(&mut self.arena, parent_id);
+        let (mut deleted_dirs, dirs_size) = DirEntry::mark_children(&mut self.arena, parent_id);
+        // updated total file count
+        self.files -= self.arena.get(parent_id).get_files() as u64;
+        self.files += file_count;
+        self.arena.get_mut(parent_id).set_files(file_count as u32);
+        DirEntry::set_size(&mut self.arena, parent_id, dirs_size + files_size);
 
-        let has_children = deleted_dirs + deleted_files > 0;
+        let has_children = deleted_dirs > 0;
         let parent_crc = self.arena.get(parent_id).path_crc();
-        for entry in children {
+        for dir in directories {
             if has_children {
                 let existing =
-                    self.find_child(parent_id, entry.get_name(), parent_crc ^ entry.path_crc());
+                    self.find_child(parent_id, dir.get_name(), parent_crc ^ dir.path_crc());
 
                 if let Some(existing) = existing {
                     let child = self.arena.get_mut(existing);
                     child.unmark();
-                    if child.is_dir() {
-                        deleted_dirs -= 1;
-                        // size of dir is sum of children sizes, so nothing to do here
-                    } else {
-                        deleted_files -= 1;
-                        FileEntry::set_size(&mut self.arena, existing, entry.get_size());
-                    }
+                    deleted_dirs -= 1;
+                    // size of dir is sum of children sizes, so nothing to do here
                     continue;
                 }
             }
 
             // entry was not found, add it
-            let child_id = self.arena.put(entry);
-            FileEntry::add_child(&mut self.arena, parent_id, child_id);
+            let child_id = self.arena.put(dir);
+            DirEntry::add_child(&mut self.arena, parent_id, child_id);
 
             let child = self.arena.get(child_id);
-            if child.is_dir() {
-                self.dirs += 1;
-                new_dirs.push(child.get_name().to_string());
-            } else {
-                self.files += 1;
-            }
+            self.dirs += 1;
+            new_dirs.push(child.get_name().to_string());
             // store new entry in path crc map
-            let bin = self.entries.entry(child.path_crc()).or_insert(vec![]);
-            bin.push(child_id);
+            self.entries
+                .entry(child.path_crc())
+                .or_default()
+                .push(child_id);
         }
 
-        let count = deleted_dirs + deleted_files;
-        if count > 0 {
-            let removed = FileEntry::remove_marked(&mut self.arena, parent_id, count);
+        if has_children {
+            let removed = DirEntry::remove_marked(&mut self.arena, parent_id, deleted_dirs);
             self.cleanup_removed(removed);
         }
 
@@ -186,14 +188,8 @@ impl FileTree {
 
     /// Cleans up removed ids recursively
     fn cleanup_removed(&mut self, entries: Vec<Id>) {
+        self.dirs -= entries.len() as u64;
         for id in entries {
-            let entry = self.arena.get(id);
-            if entry.is_dir() {
-                self.dirs -= 1;
-            } else {
-                self.files -= 1;
-            }
-
             // remove entry from index
             let path_crc = self.arena.get(id).path_crc();
             let bin = self.entries.get_mut(&path_crc).unwrap();
@@ -204,29 +200,25 @@ impl FileTree {
                 bin.swap_remove(pos);
             }
 
-            if let Some(children) = self.arena.get_mut(id).remove_children() {
-                self.cleanup_removed(children);
-            }
-            self.arena.remove(id);
+            let children = self.arena.remove(id).unwrap().take_children();
+            self.cleanup_removed(children);
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::collections::HashMap;
+    use std::fmt::Debug;
+    use std::path::{Path, PathBuf};
 
-    use crate::entry::FileEntry;
+    use crate::entry::DirEntry;
     use crate::path::EntryPath;
     use crate::tree::FileTree;
     use crate::SnapshotConfig;
 
-    fn new_dir<T: Into<String>>(name: T) -> FileEntry {
-        FileEntry::new_dir(name.into(), 0)
-    }
-
-    fn new_file<T: Into<String>>(name: T, size: i64) -> FileEntry {
-        FileEntry::new_file(name.into(), size)
+    fn new_dir<T: Into<String>>(name: T) -> DirEntry {
+        DirEntry::new_dir(name.into())
     }
 
     fn path<R: Into<PathBuf>, P: Into<PathBuf>>(root: R, path: P) -> EntryPath {
@@ -237,30 +229,47 @@ mod tests {
         tree.get_root().get_path(&tree.arena)
     }
 
+    fn files_getter<
+        S: Into<Vec<(&'static str, i64)>> + Debug,
+        T: Into<HashMap<&'static str, S>>,
+    >(
+        files: T,
+    ) -> Box<dyn Fn(&Path) -> Vec<(String, i64)>> {
+        let map = files.into();
+        let map: HashMap<_, _> = map
+            .into_iter()
+            .map(|(key, val)| (key, val.into()))
+            .collect();
+        Box::new(move |path| {
+            // replace all backslashes since in tests we use only '/'
+            let path = path.to_str().unwrap().replace('\\', "/");
+            map.get(path.as_str())
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(name, size)| (name.to_string(), size))
+                .collect()
+        })
+    }
+
     fn sample_tree() -> FileTree {
         let root = "/data/mnt".to_string();
         let mut tree = FileTree::new(root.clone());
-        tree.set_children(
-            &path(&root, "/data/mnt"),
-            vec![
-                new_file("file1", 15),
-                new_file("file2", 10),
-                new_dir("dir1"),
-            ],
-        );
-        tree.set_children(
-            &path(&root, "/data/mnt/dir1"),
-            vec![new_file("file3", 25), new_dir("dir2")],
-        );
-        tree.set_children(
-            &path(&root, "/data/mnt/dir1/dir2"),
-            vec![
-                new_file("file4", 5),
-                new_file("file5", 10),
-                new_file("file6", 10),
-            ],
-        );
+        tree.set_children(&path(&root, "/data/mnt"), vec![new_dir("dir1")], 2, 25);
+        tree.set_children(&path(&root, "/data/mnt/dir1"), vec![new_dir("dir2")], 1, 25);
+        tree.set_children(&path(&root, "/data/mnt/dir1/dir2"), vec![], 3, 25);
         tree
+    }
+
+    fn sample_getter() -> Box<dyn Fn(&Path) -> Vec<(String, i64)>> {
+        files_getter([
+            ("/data/mnt", [("file2", 10), ("file1", 15)].as_ref()),
+            ("/data/mnt/dir1", [("file3", 25)].as_ref()),
+            (
+                "/data/mnt/dir1/dir2",
+                [("file4", 5), ("file5", 10), ("file6", 10)].as_ref(),
+            ),
+        ])
     }
 
     #[test]
@@ -268,31 +277,20 @@ mod tests {
         let root = "/data/mnt".to_string();
         let mut tree = FileTree::new(root.clone());
 
-        tree.set_children(
-            &path(&root, "/data/mnt"),
-            vec![
-                new_file("file1", 15),
-                new_file("file2", 10),
-                new_dir("dir1"),
-            ],
-        );
-        tree.set_children(&path(&root, "/data/mnt/dir1"), vec![new_file("file3", 25)]);
+        tree.set_children(&path(&root, "/data/mnt"), vec![new_dir("dir1")], 2, 25);
+        tree.set_children(&path(&root, "/data/mnt/dir1"), vec![new_dir("dir2")], 1, 25);
 
         tree.arena.get(tree.root).print(&tree.arena, 5);
 
         assert_eq!(tree.find_entry(&path(&root, "/data/mnt")), Some(tree.root));
 
-        let file1 = tree.find_entry(&path(&root, "/data/mnt/file1")).unwrap();
-        let file2 = tree.find_entry(&path(&root, "/data/mnt/file2")).unwrap();
         let dir1 = tree.find_entry(&path(&root, "/data/mnt/dir1")).unwrap();
-        let file3 = tree
-            .find_entry(&path(&root, "/data/mnt/dir1/file3"))
+        let dir2 = tree
+            .find_entry(&path(&root, "/data/mnt/dir1/dir2"))
             .unwrap();
 
-        assert_eq!(tree.arena.get(file1).get_name(), "file1");
-        assert_eq!(tree.arena.get(file2).get_name(), "file2");
         assert_eq!(tree.arena.get(dir1).get_name(), "dir1");
-        assert_eq!(tree.arena.get(file3).get_name(), "file3");
+        assert_eq!(tree.arena.get(dir2).get_name(), "dir2");
 
         assert_eq!(tree.find_entry(&path(&root, "/data/mnt/test")), None);
         assert_eq!(tree.find_entry(&path("/", "/data2")), None);
@@ -301,7 +299,7 @@ mod tests {
         let stats = tree.stats();
         assert_eq!(stats.used_size.get_bytes(), 50);
         assert_eq!(stats.files, 3);
-        assert_eq!(stats.dirs, 1);
+        assert_eq!(stats.dirs, 2);
     }
 
     #[test]
@@ -310,16 +308,17 @@ mod tests {
         let mut tree = FileTree::new(root.clone());
 
         let new_dirs = tree
-            .set_children(
-                &root_path(&tree),
-                vec![new_file("file1", 5), new_file("file2", 15), new_dir("dir1")],
-            )
+            .set_children(&root_path(&tree), vec![new_dir("dir1")], 2, 20)
             .unwrap();
         assert_eq!(new_dirs.len(), 1);
         assert_eq!(new_dirs[0], "dir1");
 
         let snapshot = tree
-            .make_snapshot(&root_path(&tree), SnapshotConfig::default())
+            .make_snapshot(
+                &root_path(&tree),
+                SnapshotConfig::default(),
+                &files_getter([("/data/mnt", [("file1", 5), ("file2", 15)])]),
+            )
             .unwrap();
         let mut it = snapshot.get_root().iter();
         assert_eq!(it.next().unwrap().get_name(), "file2");
@@ -333,10 +332,10 @@ mod tests {
         let mut tree = sample_tree();
         tree.get_root().print(tree.get_arena(), 5);
 
-        tree.set_children(&root_path(&tree), vec![]);
+        tree.set_children(&root_path(&tree), vec![], 0, 0);
         tree.get_root().print(tree.get_arena(), 5);
         let snapshot = tree
-            .make_snapshot(&root_path(&tree), SnapshotConfig::default())
+            .make_snapshot(&root_path(&tree), SnapshotConfig::default(), &|_| vec![])
             .unwrap();
         let root = snapshot.get_root();
         assert!(root.iter().next().is_none());
@@ -350,12 +349,9 @@ mod tests {
         let new_dirs = tree
             .set_children(
                 &path("/data/mnt", "/data/mnt/dir1"),
-                vec![
-                    new_file("file1", 30),
-                    new_dir("dir2"),
-                    new_dir("dir3"),
-                    new_dir("dir4"),
-                ],
+                vec![new_dir("dir2"), new_dir("dir3"), new_dir("dir4")],
+                1,
+                30,
             )
             .unwrap();
         tree.get_root().print(tree.get_arena(), 5);
@@ -370,6 +366,7 @@ mod tests {
             .make_snapshot(
                 &path("/data/mnt", "/data/mnt/dir1"),
                 SnapshotConfig::default(),
+                &files_getter([("/data/mnt/dir1", [("file1", 30)])]),
             )
             .unwrap();
         let children: Vec<_> = snapshot
@@ -387,10 +384,7 @@ mod tests {
             ]
         );
 
-        tree.set_children(
-            &path("/data/mnt", "/data/mnt/dir1/dir2"),
-            vec![new_file("file6", 5), new_file("file7", 45)],
-        );
+        tree.set_children(&path("/data/mnt", "/data/mnt/dir1/dir2"), vec![], 2, 50);
         assert_eq!(tree.stats().dirs, 4);
         assert_eq!(tree.stats().files, 5);
         assert_eq!(tree.stats().used_size.get_bytes(), 105);
@@ -400,6 +394,7 @@ mod tests {
             .make_snapshot(
                 &path("/data/mnt", "/data/mnt/dir1/dir2"),
                 SnapshotConfig::default(),
+                &files_getter([("/data/mnt/dir1/dir2", [("file6", 5), ("file7", 45)])]),
             )
             .unwrap()
             .get_root()
@@ -418,7 +413,11 @@ mod tests {
         tree.get_root().print(tree.get_arena(), 5);
 
         let snapshot = tree
-            .make_snapshot(&root_path(&tree), SnapshotConfig::default())
+            .make_snapshot(
+                &root_path(&tree),
+                SnapshotConfig::default(),
+                &sample_getter(),
+            )
             .unwrap();
 
         let root = snapshot.get_root();
@@ -461,6 +460,7 @@ mod tests {
             .make_snapshot(
                 &path("/data/mnt", "/data/mnt/dir1"),
                 SnapshotConfig::default(),
+                &sample_getter(),
             )
             .unwrap();
 
@@ -508,6 +508,7 @@ mod tests {
                     max_depth: 1,
                     ..SnapshotConfig::default()
                 },
+                &sample_getter(),
             )
             .unwrap();
 
@@ -537,9 +538,10 @@ mod tests {
             .make_snapshot(
                 &root_path(&tree),
                 SnapshotConfig {
-                    min_size: 15,
+                    min_size: 12,
                     ..SnapshotConfig::default()
                 },
+                &sample_getter(),
             )
             .unwrap();
 
