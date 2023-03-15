@@ -149,7 +149,7 @@ mod tests {
             CRC_BUILDER.checksum("part1".as_bytes()) ^ CRC_BUILDER.checksum("part2".as_bytes())
         );
         assert_eq!(
-            EntryPath::from(&path("/data"), &path("/data/dir/test"))
+            EntryPath::from(path("/data"), path("/data/dir/test"))
                 .unwrap()
                 .get_crc(),
             EntryPath::calc_crc(&["/data", "dir", "test"]).unwrap()
@@ -159,25 +159,25 @@ mod tests {
     #[test]
     fn from() {
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data/test"))
+            EntryPath::from(path("/data/"), path("/data/test"))
                 .unwrap()
                 .parts,
             vec!["/data/".to_string(), "test".to_string()]
         );
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data"))
+            EntryPath::from(path("/data/"), path("/data"))
                 .unwrap()
                 .parts,
             vec!["/data/".to_string()]
         );
         assert_eq!(
-            EntryPath::from(&path("/data"), &path("/data/file"))
+            EntryPath::from(path("/data"), path("/data/file"))
                 .unwrap()
                 .parts,
             vec!["/data".to_string(), "file".to_string()]
         );
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data")).unwrap(),
+            EntryPath::from(path("/data/"), path("/data")).unwrap(),
             EntryPath::new("/data/".to_string())
         );
     }
@@ -185,19 +185,19 @@ mod tests {
     #[test]
     fn get_path() {
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data/"))
+            EntryPath::from(path("/data/"), path("/data/"))
                 .unwrap()
                 .get_path(),
             PathBuf::from("/data")
         );
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data/test"))
+            EntryPath::from(path("/data/"), path("/data/test"))
                 .unwrap()
                 .get_path(),
             PathBuf::from("/data/test")
         );
         assert_eq!(
-            EntryPath::from(&path("/data/mnt"), &path("/data/mnt/test"))
+            EntryPath::from(path("/data/mnt"), path("/data/mnt/test"))
                 .unwrap()
                 .get_path(),
             PathBuf::from("/data/mnt/test")
@@ -207,20 +207,20 @@ mod tests {
     #[test]
     fn cmp_and_eq() {
         assert_eq!(
-            EntryPath::from(&path("/data/"), &path("/data/test")).unwrap(),
-            EntryPath::from(&path("/data/"), &path("/data/test")).unwrap()
+            EntryPath::from(path("/data/"), path("/data/test")).unwrap(),
+            EntryPath::from(path("/data/"), path("/data/test")).unwrap()
         );
         assert!(
-            EntryPath::from(&path("/data/"), &path("/data/")).unwrap()
-                < EntryPath::from(&path("/data/"), &path("/data/test")).unwrap()
+            EntryPath::from(path("/data/"), path("/data/")).unwrap()
+                < EntryPath::from(path("/data/"), path("/data/test")).unwrap()
         );
         assert!(
-            EntryPath::from(&path("/data/"), &path("/data/test")).unwrap()
-                > EntryPath::from(&path("/data/"), &path("/data/")).unwrap()
+            EntryPath::from(path("/data/"), path("/data/test")).unwrap()
+                > EntryPath::from(path("/data/"), path("/data/")).unwrap()
         );
-        assert!(EntryPath::from(&path("/data/"), &path("/data/test"))
+        assert!(EntryPath::from(path("/data/"), path("/data/test"))
             .unwrap()
-            .partial_cmp(&EntryPath::from(&path("/data/"), &path("/data/other")).unwrap())
+            .partial_cmp(&EntryPath::from(path("/data/"), path("/data/other")).unwrap())
             .is_none());
     }
 }

@@ -5,6 +5,10 @@ use crate::entry::DirEntry;
 use crate::entry_snapshot::EntrySnapshotRef;
 use crate::EntrySnapshot;
 
+/// Function that is used to retrieve files
+/// and their sizes at specified path
+pub type FilesRetrieverFn = dyn Fn(&Path) -> Vec<(String, i64)>;
+
 #[derive(Clone, Debug)]
 pub struct SnapshotConfig {
     pub max_depth: usize,
@@ -36,7 +40,7 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
         arena: &Arena<DirEntry>,
         config: SnapshotConfig,
         wrapper: &dyn Fn(EntrySnapshot) -> W,
-        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
+        files_getter: &FilesRetrieverFn,
     ) -> Self {
         let entry = arena.get(root);
         let mut snapshots = Arena::default();

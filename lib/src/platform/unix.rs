@@ -36,8 +36,8 @@ pub fn get_mount_stats<P: AsRef<Path>>(path: P) -> Option<MountStats> {
     let available = statvfs.fragment_size() * u64::from(statvfs.blocks_available());
 
     Some(MountStats {
-        total: Byte::from_bytes(total as u64),
-        available: Byte::from_bytes(available as u64),
+        total: Byte::from_bytes(total),
+        available: Byte::from_bytes(available),
         is_mount_point,
     })
 }

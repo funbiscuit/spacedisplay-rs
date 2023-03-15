@@ -245,7 +245,7 @@ impl Scanner {
                         for task in w
                             .read_events()
                             .into_iter()
-                            .filter_map(|e| EntryPath::from(&root, &e.updated_path))
+                            .filter_map(|e| EntryPath::from(&root, e.updated_path))
                             .map(|path| ScanTask {
                                 recursive: false,
                                 reset_stopwatch: false,

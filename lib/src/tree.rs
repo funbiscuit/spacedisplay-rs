@@ -1,11 +1,11 @@
 use std::collections::HashMap;
-use std::path::Path;
 
 use byte_unit::Byte;
 
 use crate::arena::{Arena, Id};
 use crate::entry::DirEntry;
 use crate::path::{EntryPath, PathCrc};
+use crate::tree_snapshot::FilesRetrieverFn;
 use crate::{EntrySnapshot, SnapshotConfig, TreeSnapshot};
 
 #[derive(Clone, Debug)]
@@ -76,7 +76,7 @@ impl FileTree {
         &self,
         root: &EntryPath,
         config: SnapshotConfig,
-        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
+        files_getter: &FilesRetrieverFn,
     ) -> Option<TreeSnapshot<EntrySnapshot>> {
         self.make_snapshot_wrapped(root, config, &std::convert::identity, files_getter)
     }
@@ -86,7 +86,7 @@ impl FileTree {
         root: &EntryPath,
         config: SnapshotConfig,
         wrapper: &dyn Fn(EntrySnapshot) -> W,
-        files_getter: &dyn Fn(&Path) -> Vec<(String, i64)>,
+        files_getter: &FilesRetrieverFn,
     ) -> Option<TreeSnapshot<W>>
     where
         W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>,
@@ -210,11 +210,12 @@ impl FileTree {
 mod tests {
     use std::collections::HashMap;
     use std::fmt::Debug;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
 
     use crate::entry::DirEntry;
     use crate::path::EntryPath;
     use crate::tree::FileTree;
+    use crate::tree_snapshot::FilesRetrieverFn;
     use crate::SnapshotConfig;
 
     fn new_dir<T: Into<String>>(name: T) -> DirEntry {
@@ -222,7 +223,7 @@ mod tests {
     }
 
     fn path<R: Into<PathBuf>, P: Into<PathBuf>>(root: R, path: P) -> EntryPath {
-        EntryPath::from(&root.into(), &path.into()).unwrap()
+        EntryPath::from(root.into(), path.into()).unwrap()
     }
 
     fn root_path(tree: &FileTree) -> EntryPath {
@@ -234,7 +235,7 @@ mod tests {
         T: Into<HashMap<&'static str, S>>,
     >(
         files: T,
-    ) -> Box<dyn Fn(&Path) -> Vec<(String, i64)>> {
+    ) -> Box<FilesRetrieverFn> {
         let map = files.into();
         let map: HashMap<_, _> = map
             .into_iter()
@@ -261,7 +262,7 @@ mod tests {
         tree
     }
 
-    fn sample_getter() -> Box<dyn Fn(&Path) -> Vec<(String, i64)>> {
+    fn sample_getter() -> Box<FilesRetrieverFn> {
         files_getter([
             ("/data/mnt", [("file2", 10), ("file1", 15)].as_ref()),
             ("/data/mnt/dir1", [("file3", 25)].as_ref()),
@@ -305,7 +306,7 @@ mod tests {
     #[test]
     fn set_children_from_empty() {
         let root = "/data/mnt".to_string();
-        let mut tree = FileTree::new(root.clone());
+        let mut tree = FileTree::new(root);
 
         let new_dirs = tree
             .set_children(&root_path(&tree), vec![new_dir("dir1")], 2, 20)

@@ -140,7 +140,7 @@ impl Dialog for DeleteDialog {
     fn try_finish(self: Box<Self>, _: &mut App) -> Result<(), Box<dyn Dialog>> {
         if self.chosen.unwrap_or(false) {
             let path = self.path.get_path();
-            diskscan::delete_path(&path);
+            diskscan::delete_path(path);
             Ok(())
         } else if self.should_close {
             Ok(())

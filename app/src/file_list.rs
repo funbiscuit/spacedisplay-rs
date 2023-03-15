@@ -191,10 +191,10 @@ impl<'a> StatefulWidget for FileList<'a> {
             let (elem_x, max_name_width) = {
                 let (elem_x, _) =
                     buf.set_stringn(x, y, symbol, max_name_width as usize, item_style);
-                (elem_x, (max_name_width - (elem_x - x)) as u16)
+                (elem_x, (max_name_width - (elem_x - x)))
             };
             let line = &item.name;
-            buf.set_stringn(elem_x, y as u16, line, max_name_width as usize, item.style);
+            buf.set_stringn(elem_x, y, line, max_name_width as usize, item.style);
 
             if is_selected {
                 buf.set_style(area, self.highlight_style);

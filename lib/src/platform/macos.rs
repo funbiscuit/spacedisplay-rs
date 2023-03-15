@@ -24,5 +24,5 @@ pub fn get_excluded_paths() -> Vec<PathBuf> {
 
 pub fn get_used_memory() -> Option<Byte> {
     let info: RUsageInfoV0 = pid_rusage::pidrusage(std::process::id() as i32).ok()?;
-    Some(Byte::from_bytes(info.memory_used() as u64))
+    Some(Byte::from_bytes(info.memory_used()))
 }

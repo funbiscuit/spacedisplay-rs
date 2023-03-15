@@ -148,7 +148,7 @@ impl<'a> StatefulWidget for LogList<'a> {
 
             buf.set_stringn(
                 x,
-                y as u16,
+                y,
                 &time,
                 time_width,
                 Style::default().fg(Color::DarkGray),
@@ -163,7 +163,7 @@ impl<'a> StatefulWidget for LogList<'a> {
 
             if self.entries.len() > list_height
                 && i >= scroll_offset
-                && i <= scroll_offset as usize + scroll_height
+                && i <= scroll_offset + scroll_height
             {
                 buf.set_string(
                     x + list_area.width - 1,
