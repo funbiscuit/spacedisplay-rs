@@ -8,7 +8,7 @@ Library to scan your disk space.
 repository = "https://github.com/funbiscuit/spacedisplay-rs"
 readme = "../README.md"
 keywords = ["disk", "scan"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 categories = ["filesystem"]
 edition = "2021"
 

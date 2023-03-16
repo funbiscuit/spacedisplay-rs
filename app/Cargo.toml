@@ -8,7 +8,7 @@ Fast and lightweight tool to scan your disk space.
 repository = "https://github.com/funbiscuit/spacedisplay-rs"
 readme = "../README.md"
 keywords = ["terminal", "disk", "scan"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 categories = ["command-line-utilities", "filesystem"]
 edition = "2021"
 
