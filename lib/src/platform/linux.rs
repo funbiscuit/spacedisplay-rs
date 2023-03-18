@@ -45,7 +45,7 @@ pub fn get_excluded_paths() -> Vec<PathBuf> {
 }
 
 pub fn get_used_memory() -> Option<Byte> {
-    let statm = procinfo::pid::statm_self().ok()?;
-    let bytes = statm.resident * page_size::get();
-    Some(Byte::from_bytes(bytes as u64))
+    let statm = procfs::process::Process::myself().ok()?.statm().ok()?;
+    let bytes = statm.resident * (page_size::get() as u64);
+    Some(Byte::from_bytes(bytes))
 }

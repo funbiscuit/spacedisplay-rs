@@ -18,20 +18,20 @@ chrono = "0.4.22"
 crc = "3.0.0"
 derivative = "2.2.0"
 mountpoints = "0.2.1"
-ptree = "0.4.0"
+ptree = { version = "0.4.0", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 inotify = "0.10.0"
-procinfo = "0.4.2"
-page_size = "0.4.2"
+page_size = "0.5.0"
+procfs = "0.15.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 fsevent = "2.1.2"
-libproc = "0.12.0"
+libproc = "0.13.0"
 
 [target.'cfg(unix)'.dependencies]
 proc-mounts = "0.3.0"
-nix = "0.25.0"
+nix = "0.26.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.42.0", features = [
