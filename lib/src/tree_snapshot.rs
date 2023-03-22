@@ -1,5 +1,8 @@
 use std::path::Path;
 
+use byte_unit::Byte;
+use ptree::TreeBuilder;
+
 use crate::arena::{Arena, Id};
 use crate::entry::DirEntry;
 use crate::entry_snapshot::EntrySnapshotRef;
@@ -69,6 +72,48 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
 
     pub fn get_root(&self) -> EntrySnapshotRef<'_, W> {
         self.get_entry(self.root).unwrap()
+    }
+
+    /// Print this snapshot to stdout as tree with specified depth
+    pub fn print(&self, size_formatter: &dyn Fn(Byte) -> String, depth: usize) {
+        fn _entry_title(
+            entry: &'_ EntrySnapshot,
+            size_formatter: &dyn Fn(Byte) -> String,
+        ) -> String {
+            let t = if entry.is_dir() { "d" } else { "f" };
+            let size = size_formatter(entry.get_size());
+            format!("{} {} {}", t, size, entry.get_name())
+        }
+
+        // helper function to recursively populate entry tree
+        fn _print<W2: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>>(
+            entry: EntrySnapshotRef<'_, W2>,
+            size_formatter: &dyn Fn(Byte) -> String,
+            builder: &mut TreeBuilder,
+            depth: usize,
+        ) {
+            builder.begin_child(_entry_title(entry.as_ref(), size_formatter));
+
+            if depth > 0 && entry.as_ref().is_dir() {
+                for child in entry.iter() {
+                    _print(child, size_formatter, builder, depth - 1);
+                }
+            }
+            builder.end_child();
+        }
+
+        let entry = self.get_root();
+        // Build a dir tree using a TreeBuilder
+        let mut builder = TreeBuilder::new(_entry_title(entry.as_ref(), size_formatter));
+        if depth > 0 {
+            for child in entry.iter() {
+                _print(child, size_formatter, &mut builder, depth - 1);
+            }
+        }
+        let tree = builder.build();
+
+        // write out the tree using default formatting
+        let _ = ptree::print_tree(&tree);
     }
 
     fn fill_snapshot(

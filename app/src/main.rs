@@ -7,6 +7,7 @@ mod app;
 mod dialog;
 mod file_list;
 mod log_list;
+mod no_ui;
 mod progressbar;
 mod term;
 mod ui;
@@ -15,6 +16,10 @@ mod utils;
 #[derive(Debug, Parser)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
+    /// Run without UI. Performs scan of specified path and prints results
+    #[arg(long)]
+    no_ui: bool,
+
     /// Path to directory to scan
     path: Option<String>,
 
@@ -30,7 +35,11 @@ pub struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    term::run(args)?;
+    if args.no_ui {
+        no_ui::run(args)?;
+    } else {
+        term::run(args)?;
+    }
 
     Ok(())
 }

@@ -187,7 +187,7 @@ impl Scanner {
         let state = Arc::new(ScanState {
             tree: Mutex::new(tree),
             current_path: Mutex::new(None),
-            is_scanning: AtomicBool::new(false),
+            is_scanning: AtomicBool::new(true),
             scan_flag: AtomicBool::new(true),
             scan_duration_ms: AtomicU32::new(0),
             logger,
