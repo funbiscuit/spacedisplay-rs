@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
@@ -236,6 +237,7 @@ impl Scanner {
             let mut children = vec![];
 
             let excluded = platform::get_excluded_paths();
+            let excluded: HashSet<_> = excluded.into_iter().collect();
             let log = |msg| state.logger.as_ref().map(|l| l.log(msg));
 
             while state.scan_flag.load(Ordering::SeqCst) {
