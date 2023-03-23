@@ -71,6 +71,43 @@ Finder in macOS.
 spacedisplay is also lightweight in terms of memory usage.  
 To scan 1M files it uses only ~45MB of RAM (measured in Ubuntu 22.04).
 
+# Performance tests
+
+Performance of `spacedisplay` can be measured (relatively to other tools) via
+`performance.sh` (on Linux and macOS) and `performance.ps` (on Windows). For performance
+measurement [hyperfine](https://github.com/sharkdp/hyperfine) is used.
+On Windows you will also have to enable execution of scripts:
+
+```shell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+These scripts don't measure actual hard drive speed since warmup is used and filesystem information is cached
+at OS level. On first run scan time will be much higher due to slow calls to hard drive.
+
+Results on some platforms:
+
+## Manjaro 22.0.5 (600k files)
+
+| Command        |      Mean [s] | Min [s] | Max [s] |    Relative |
+|:---------------|--------------:|--------:|--------:|------------:|
+| `spacedisplay` | 1.252 ± 0.014 |   1.235 |   1.281 |        1.00 |
+| `du -sh`       | 1.868 ± 0.037 |   1.830 |   1.965 | 1.49 ± 0.03 |
+
+## macOS 11.7 (65k files)
+
+| Command        |      Mean [s] | Min [s] | Max [s] |    Relative |
+|:---------------|--------------:|--------:|--------:|------------:|
+| `spacedisplay` | 1.211 ± 0.055 |   1.153 |   1.343 | 2.98 ± 0.14 |
+| `du -sh`       | 0.407 ± 0.003 |   0.404 |   0.412 |        1.00 |
+
+## Windows (60k files)
+
+| Command        |      Mean [s] | Min [s] | Max [s] |    Relative |
+|:---------------|--------------:|--------:|--------:|------------:|
+| `spacedisplay` | 0.561 ± 0.013 |   0.544 |   0.587 |        1.00 |
+| `dir /s`       | 1.647 ± 0.107 |   1.515 |   1.816 | 2.94 ± 0.20 |
+
 ## License
 
 Licensed under either of
