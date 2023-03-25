@@ -236,8 +236,15 @@ impl Scanner {
             let mut queue: Vec<ScanTask> = vec![];
             let mut children = vec![];
 
-            let excluded = platform::get_excluded_paths();
-            let excluded: HashSet<_> = excluded.into_iter().collect();
+            let available: HashSet<_> = platform::get_available_mounts().into_iter().collect();
+            // excluded paths are all available mounts (excluding root scan path)
+            // and all unsupported mounts
+            let excluded: HashSet<_> = platform::get_excluded_paths()
+                .into_iter()
+                .filter_map(|p| p.to_str().map(|s| s.to_string()))
+                .chain(available.into_iter())
+                .filter(|p| p != &root)
+                .collect();
             let log = |msg| state.logger.as_ref().map(|l| l.log(msg));
 
             while state.scan_flag.load(Ordering::SeqCst) {
@@ -273,7 +280,11 @@ impl Scanner {
                 }
 
                 if let Some(task) = queue.pop() {
-                    watcher.as_mut().map(|w| w.add_dir(task.path.to_string()));
+                    let task_path = task.path.to_string();
+                    if excluded.contains(&task_path) {
+                        continue;
+                    }
+                    watcher.as_mut().map(|w| w.add_dir(task_path));
                     state
                         .current_path
                         .lock()
@@ -291,11 +302,7 @@ impl Scanner {
                     for entry in entries {
                         if let Ok(metadata) = entry.metadata() {
                             let name = entry.file_name().to_str().unwrap().to_string();
-                            if task.recursive
-                                && metadata.is_dir()
-                                && !metadata.is_symlink()
-                                && !excluded.contains(&entry.path())
-                            {
+                            if task.recursive && metadata.is_dir() && !metadata.is_symlink() {
                                 let mut path = task.path.clone();
                                 path.join(name.clone());
                                 queue.push(ScanTask {

@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use byte_unit::Byte;
 
 //todo can add more supported fs
-const SUPPORTED_FS: &[&str] = &["ext2", "ext3", "ext4", "vfat", "ntfs", "fuseblk"];
+const SUPPORTED_FS: &[&str] = &[
+    "exfat", "ext2", "ext3", "ext4", "vfat", "ntfs", "fuseblk", "tmpfs",
+];
 
 /// Returns all mount points that can be scanned
 pub fn get_available_mounts() -> Vec<String> {

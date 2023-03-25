@@ -158,8 +158,12 @@ impl<W: AsRef<EntrySnapshot> + AsMut<EntrySnapshot>> TreeSnapshot<W> {
             })
             .collect();
         let path = entry.get_path(arena).get_path();
-        // get files for this entry
-        let files = files_getter(&path);
+        // get files for this entry (only if it had any)
+        let files = if entry.get_files() > 0 {
+            files_getter(&path)
+        } else {
+            vec![]
+        };
 
         children.extend(
             files
