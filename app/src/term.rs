@@ -1,7 +1,9 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use crossterm::event::{DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode};
+use crossterm::event::{
+    DisableMouseCapture, EnableMouseCapture, Event as CEvent, KeyCode, KeyEvent, KeyEventKind,
+};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -13,6 +15,24 @@ use crate::app::App;
 use crate::{ui, Args};
 
 pub trait InputHandler {
+    fn on_press(&mut self, event: KeyEvent) {
+        match event.code {
+            KeyCode::Char(c) => self.on_key(c),
+            KeyCode::Up => self.on_up(),
+            KeyCode::Down => self.on_down(),
+            KeyCode::Left => self.on_left(),
+            KeyCode::Right => self.on_right(),
+            KeyCode::Enter => self.on_enter(),
+            KeyCode::Esc => self.on_esc(),
+            KeyCode::Backspace => self.on_esc(),
+            KeyCode::F(n) => self.on_fn(n),
+            KeyCode::PageDown => self.on_page_down(),
+            KeyCode::PageUp => self.on_page_up(),
+            KeyCode::End => self.on_end(),
+            KeyCode::Home => self.on_home(),
+            _ => {}
+        }
+    }
     fn on_backspace(&mut self) {}
     fn on_down(&mut self) {}
     fn on_end(&mut self) {}
@@ -73,22 +93,9 @@ impl<'a, B: Backend> InputProvider for AppRunner<'a, B> {
             .checked_sub(self.last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
         if event::poll(timeout)? {
-            if let CEvent::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char(c) => handler.on_key(c),
-                    KeyCode::Up => handler.on_up(),
-                    KeyCode::Down => handler.on_down(),
-                    KeyCode::Left => handler.on_left(),
-                    KeyCode::Right => handler.on_right(),
-                    KeyCode::Enter => handler.on_enter(),
-                    KeyCode::Esc => handler.on_esc(),
-                    KeyCode::Backspace => handler.on_esc(),
-                    KeyCode::F(n) => handler.on_fn(n),
-                    KeyCode::PageDown => handler.on_page_down(),
-                    KeyCode::PageUp => handler.on_page_up(),
-                    KeyCode::End => handler.on_end(),
-                    KeyCode::Home => handler.on_home(),
-                    _ => {}
+            if let CEvent::Key(key_event) = event::read()? {
+                if key_event.kind == KeyEventKind::Press {
+                    handler.on_press(key_event);
                 }
             }
         }
