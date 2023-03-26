@@ -1,15 +1,15 @@
-use std::sync::Arc;
-
 use derivative::Derivative;
+use log::LevelFilter;
 
 use diskscan::{
-    EntryPath, EntrySnapshot, EntrySnapshotRef, LogEntry, Logger, ScanStats, Scanner,
-    ScannerBuilder, SnapshotConfig, TreeSnapshot,
+    EntryPath, EntrySnapshot, EntrySnapshotRef, ScanStats, Scanner, ScannerBuilder, SnapshotConfig,
+    TreeSnapshot,
 };
 
 use crate::dialog::{DeleteDialog, Dialog, NewScanDialog, ScanStatsDialog};
 use crate::file_list::FileListState;
 use crate::log_list::LogListState;
+use crate::logger::{LogEntry, Logger};
 use crate::term::{InputHandler, InputProvider};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,15 +21,15 @@ pub enum Screen {
 
 #[derive(Debug)]
 pub struct LogsApp {
-    pub logger: Arc<Logger>,
+    pub logger: &'static Logger,
     pub entries: Vec<LogEntry>,
     pub list_state: LogListState,
 }
 
 impl LogsApp {
-    fn new(logger: Arc<Logger>) -> Self {
+    fn new() -> Self {
         Self {
-            logger,
+            logger: Logger::global(),
             entries: vec![],
             list_state: LogListState::default(),
         }
@@ -74,14 +74,11 @@ pub struct FilesApp {
     pub path_history: Vec<String>,
     pub snapshot: Option<TreeSnapshot<EntrySnapshot>>,
     pub stats: ScanStats,
-    pub logger: Arc<Logger>,
 }
 
 impl FilesApp {
-    pub fn new_scan(path: String, logger: Arc<Logger>) -> Self {
-        let scanner = ScannerBuilder::default()
-            .logger(Arc::clone(&logger))
-            .scan(path);
+    pub fn new_scan(path: String) -> Self {
+        let scanner = ScannerBuilder::default().scan(path);
         let file_list_state = FileListState::default();
         let current_path = scanner.get_scan_path().clone();
         let stats = scanner.stats();
@@ -92,7 +89,6 @@ impl FilesApp {
             path_history: vec![],
             snapshot: None,
             stats,
-            logger,
         }
     }
 
@@ -235,21 +231,22 @@ pub struct App {
     pub dialog: Option<Box<dyn Dialog>>,
     pub dialog_menu: Option<usize>,
     pub should_quit: bool,
-    pub logger: Arc<Logger>,
     pub logs_app: LogsApp,
 }
 
 impl App {
     pub fn new() -> Self {
-        let logger = Arc::new(Logger::default());
+        // register our logger
+        log::set_logger(Logger::global()).unwrap();
+        log::set_max_level(LevelFilter::Info);
+
         App {
             files: None,
             screen: Screen::Help,
             dialog: None,
             dialog_menu: None,
             should_quit: false,
-            logger: Arc::clone(&logger),
-            logs_app: LogsApp::new(logger),
+            logs_app: LogsApp::new(),
         }
     }
 
@@ -286,7 +283,7 @@ impl App {
     }
 
     pub fn start_scan(&mut self, path: String) {
-        self.files = Some(FilesApp::new_scan(path, Arc::clone(&self.logger)));
+        self.files = Some(FilesApp::new_scan(path));
         self.screen = Screen::Files;
     }
 

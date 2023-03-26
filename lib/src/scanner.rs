@@ -10,7 +10,6 @@ use std::time::{Duration, Instant};
 use byte_unit::Byte;
 
 use crate::entry::DirEntry;
-use crate::logger::Logger;
 use crate::tree::FileTree;
 use crate::watcher::Watcher;
 use crate::{platform, EntryPath, EntrySnapshot, SnapshotConfig, TreeSnapshot};
@@ -38,8 +37,6 @@ struct ScanState {
     scan_flag: AtomicBool,
 
     scan_duration_ms: AtomicU32,
-
-    logger: Option<Arc<Logger>>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -49,19 +46,13 @@ struct ScanTask {
     recursive: bool,
 }
 
+#[non_exhaustive]
 #[derive(Debug, Default)]
-pub struct ScannerBuilder {
-    logger: Option<Arc<Logger>>,
-}
+pub struct ScannerBuilder;
 
 impl ScannerBuilder {
-    pub fn logger(mut self, logger: Arc<Logger>) -> Self {
-        self.logger = Some(logger);
-        self
-    }
-
     pub fn scan(self, path: String) -> Scanner {
-        Scanner::new(path, self.logger)
+        Scanner::new(path)
     }
 }
 
@@ -116,6 +107,7 @@ impl Scanner {
     }
 
     pub fn rescan_path(&self, path: EntryPath, reset_stopwatch: bool) {
+        info!("Start rescan of '{}'", path);
         self.tx
             .send(ScanTask {
                 path,
@@ -175,7 +167,7 @@ impl Scanner {
         queue.push(task);
     }
 
-    fn new(path: String, logger: Option<Arc<Logger>>) -> Self {
+    fn new(path: String) -> Self {
         let tree = FileTree::new(path.clone());
         let root = tree.get_root().get_path(tree.get_arena());
         let (tx, rx) = std::sync::mpsc::channel();
@@ -191,7 +183,6 @@ impl Scanner {
             is_scanning: AtomicBool::new(true),
             scan_flag: AtomicBool::new(true),
             scan_duration_ms: AtomicU32::new(0),
-            logger,
         });
 
         let scan_handle = Scanner::start_scan(path, Arc::clone(&state), rx);
@@ -245,7 +236,8 @@ impl Scanner {
                 .chain(available.into_iter())
                 .filter(|p| p != &root)
                 .collect();
-            let log = |msg| state.logger.as_ref().map(|l| l.log(msg));
+
+            info!("Start scan of '{}'", root);
 
             while state.scan_flag.load(Ordering::SeqCst) {
                 while state.scan_flag.load(Ordering::SeqCst) {
@@ -267,7 +259,6 @@ impl Scanner {
                     // add all tasks to queue
                     for task in rx.try_iter() {
                         if task.reset_stopwatch && !state.is_scanning.load(Ordering::SeqCst) {
-                            log("Start scan".to_string());
                             start = Instant::now();
                             state.is_scanning.store(true, Ordering::SeqCst);
                         }
@@ -293,7 +284,7 @@ impl Scanner {
                     let entries: Vec<_> = std::fs::read_dir(&task.path.get_path())
                         .and_then(|dir| dir.collect::<Result<_, _>>())
                         .unwrap_or_else(|_| {
-                            log(format!("Unable to scan {}", task.path));
+                            warn!("Unable to scan '{}'", task.path);
                             vec![]
                         });
 
@@ -320,7 +311,7 @@ impl Scanner {
                                 files_size += platform::get_file_size(&metadata) as i64;
                             }
                         } else {
-                            log(format!("Unable to get metadata for {:?}", entry.path()));
+                            warn!("Failed to get metadata for {:?}", entry.path());
                         }
                     }
                     let new_dirs = {
@@ -348,12 +339,12 @@ impl Scanner {
                     state.scan_duration_ms.store(duration, Ordering::SeqCst);
                     if queue.is_empty() {
                         let stats = state.tree.lock().unwrap().stats();
-                        log(format!(
+                        info!(
                             "Scan finished: {} files {} dirs in {:?}",
                             stats.files,
                             stats.dirs,
                             Duration::from_millis(duration as u64)
-                        ));
+                        );
                     }
                 }
                 if queue.is_empty() {

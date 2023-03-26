@@ -1,10 +1,12 @@
+use log::Level;
+use time::format_description::FormatItem;
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Color, Style};
+use tui::style::{Color, Modifier, Style};
+use tui::text::{Span, Spans};
 use tui::widgets::{Block, StatefulWidget, Widget};
-use unicode_width::UnicodeWidthStr;
 
-use diskscan::LogEntry;
+use crate::logger::LogEntry;
 
 #[derive(Debug, Clone, Default)]
 pub struct LogListState {
@@ -46,13 +48,19 @@ impl LogListState {
 pub struct LogList<'a> {
     block: Option<Block<'a>>,
     entries: &'a [LogEntry],
+    time_formatter: &'static [FormatItem<'static>],
 }
 
 impl<'a> LogList<'a> {
     pub fn new(entries: &'a [LogEntry]) -> LogList<'a> {
+        let time_formatter = time::macros::format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second].[subsecond digits:3]"
+        );
+
         LogList {
             block: None,
             entries,
+            time_formatter,
         }
     }
 
@@ -88,6 +96,15 @@ impl<'a> LogList<'a> {
         }
 
         (start, end)
+    }
+
+    fn level_color(level: Level) -> Color {
+        match level {
+            Level::Error => Color::Red,
+            Level::Warn => Color::Yellow,
+            Level::Info => Color::Green,
+            _ => Color::DarkGray,
+        }
     }
 }
 
@@ -142,24 +159,33 @@ impl<'a> StatefulWidget for LogList<'a> {
         {
             let (x, y) = (list_area.left(), list_area.top() + i as u16);
 
-            let time = format!("{}", item.timestamp.format("%Y-%m-%d %H:%M:%S%.3f"));
-            let time_width = time.width();
-            let max_text_width = list_area.width.saturating_sub(time_width as u16 + 2);
+            let time = item
+                .timestamp
+                .format(&self.time_formatter)
+                .unwrap()
+                .to_string();
 
-            buf.set_stringn(
-                x,
-                y,
-                &time,
-                time_width,
-                Style::default().fg(Color::DarkGray),
-            );
-            buf.set_stringn(
-                x + time_width as u16 + 1,
-                y,
+            let mut spans = vec![
+                Span::styled(time, Style::default().fg(Color::DarkGray)),
+                Span::raw(" "),
+                Span::styled(
+                    item.level.as_str(),
+                    Style::default()
+                        .fg(LogList::level_color(item.level))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" "),
+            ];
+            if let Some(module) = &item.module {
+                spans.push(Span::styled(module, Style::default()));
+                spans.push(Span::raw(" "));
+            }
+            spans.push(Span::styled(
                 &item.text,
-                max_text_width as usize,
-                Style::default(),
-            );
+                Style::default().add_modifier(Modifier::BOLD),
+            ));
+
+            buf.set_spans(x, y, &Spans::from(spans), list_area.width - 1);
 
             if self.entries.len() > list_height
                 && i >= scroll_offset

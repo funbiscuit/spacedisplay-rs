@@ -7,6 +7,7 @@ mod app;
 mod dialog;
 mod file_list;
 mod log_list;
+mod logger;
 mod no_ui;
 mod progressbar;
 mod term;
