@@ -1,6 +1,6 @@
 [package]
 name = "diskscan"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Sviatoslav Kokurin <kokurinsv@gmail.com>"]
 description = """
 Library to scan your disk space.

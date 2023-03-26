@@ -1,5 +1,5 @@
 name: spacedisplay
-version: '0.2.0'
+version: '0.3.0'
 summary: Fast and lightweight tool to scan your disk space.
 description: |
   spacedisplay is a terminal app that allow you

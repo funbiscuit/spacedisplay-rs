@@ -1,6 +1,6 @@
 [package]
 name = "spacedisplay"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Sviatoslav Kokurin <kokurinsv@gmail.com>"]
 description = """
 Fast and lightweight tool to scan your disk space.
@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "filesystem"]
 edition = "2021"
 
 [dependencies]
-diskscan = { path = "../lib", version = "0.2.0" }
+diskscan = { path = "../lib", version = "0.3.0" }
 
 anyhow = "1.0"
 byte-unit = { version = "4.0", default-features = false, features = ["std"] }
