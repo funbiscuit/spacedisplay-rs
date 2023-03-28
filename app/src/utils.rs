@@ -1,5 +1,5 @@
 use byte_unit::Byte;
-use tui::symbols;
+use ratatui::symbols;
 
 pub fn byte_to_str(b: Byte, padding: usize) -> String {
     format!(

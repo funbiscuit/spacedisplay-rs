@@ -1,9 +1,9 @@
 use num_format::{CustomFormat, Grouping};
-use tui::buffer::Buffer;
-use tui::layout::Rect;
-use tui::style::{Color, Style};
-use tui::text::Span;
-use tui::widgets::Widget;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Style};
+use ratatui::text::Span;
+use ratatui::widgets::Widget;
 use unicode_width::UnicodeWidthStr;
 
 #[derive(Debug, Clone)]

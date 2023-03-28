@@ -1,9 +1,9 @@
 use byte_unit::Byte;
-use tui::buffer::Buffer;
-use tui::layout::{Alignment, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Spans};
-use tui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget};
+use ratatui::buffer::Buffer;
+use ratatui::layout::{Alignment, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Span, Spans};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget};
 use unicode_width::UnicodeWidthStr;
 
 use diskscan::EntryPath;

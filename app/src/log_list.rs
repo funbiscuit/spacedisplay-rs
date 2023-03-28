@@ -1,10 +1,10 @@
 use log::Level;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Span, Spans};
+use ratatui::widgets::{Block, StatefulWidget, Widget};
 use time::format_description::FormatItem;
-use tui::buffer::Buffer;
-use tui::layout::Rect;
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Spans};
-use tui::widgets::{Block, StatefulWidget, Widget};
 
 use crate::logger::LogEntry;
 
@@ -194,7 +194,7 @@ impl<'a> StatefulWidget for LogList<'a> {
                 buf.set_string(
                     x + list_area.width - 1,
                     y,
-                    tui::symbols::line::VERTICAL,
+                    ratatui::symbols::line::VERTICAL,
                     Style::default(),
                 )
             }

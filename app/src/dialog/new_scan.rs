@@ -1,8 +1,8 @@
-use tui::buffer::Buffer;
-use tui::layout::Rect;
-use tui::style::{Color, Modifier, Style};
-use tui::text::Spans;
-use tui::widgets::{
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::Spans;
+use ratatui::widgets::{
     Block, BorderType, Borders, Clear, List, ListItem, ListState, StatefulWidget, Widget,
 };
 use unicode_width::UnicodeWidthStr;

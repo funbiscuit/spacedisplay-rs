@@ -1,8 +1,8 @@
 use num_format::{CustomFormat, Grouping};
-use tui::buffer::Buffer;
-use tui::layout::Rect;
-use tui::style::{Color, Style};
-use tui::widgets::{Block, BorderType, Borders, Clear, Widget};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Widget};
 use unicode_width::UnicodeWidthStr;
 
 use diskscan::ScanStats;

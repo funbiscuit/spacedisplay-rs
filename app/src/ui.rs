@@ -1,10 +1,10 @@
 use byte_unit::Byte;
-use tui::backend::Backend;
-use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
-use tui::style::{Color, Modifier, Style};
-use tui::text::{Span, Spans};
-use tui::widgets::{Block, BorderType, Borders, Paragraph, Tabs};
-use tui::Frame;
+use ratatui::backend::Backend;
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Span, Spans};
+use ratatui::widgets::{Block, BorderType, Borders, Paragraph, Tabs};
+use ratatui::Frame;
 
 use diskscan::SnapshotConfig;
 

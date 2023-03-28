@@ -23,6 +23,6 @@ derivative = "2.2.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
 num-format = "0.4.3"
+ratatui = { version = "0.20.1", default-features = false, features = ["crossterm"] }
 time = { version = "0.3.20", features = ["formatting", "macros"] }
-tui = { version = "0.19", default-features = false, features = ["crossterm"] }
 unicode-width = "0.1.10"

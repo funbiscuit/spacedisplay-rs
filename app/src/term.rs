@@ -8,8 +8,8 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::{event, execute};
-use tui::backend::{Backend, CrosstermBackend};
-use tui::Terminal;
+use ratatui::backend::{Backend, CrosstermBackend};
+use ratatui::Terminal;
 
 use crate::app::App;
 use crate::{ui, Args};
