@@ -50,9 +50,41 @@ pub fn get_excluded_paths() -> Vec<PathBuf> {
 /// Retrieve file size
 ///
 /// On windows return normal file size since retrieving actual size on disk
-/// is much slower and not very useful
+/// is much slower and not very useful.
+///
+/// For cloud files not stored locally return 0.
 pub fn get_file_size(metadata: &Metadata) -> u64 {
-    metadata.file_size()
+    // The following potentially applicable flags were observed when using cloud storage apps:
+    // - Dropbox 172.4.7555:
+    //   - "online-only":
+    //     - REPARSE_POINT | OFFLINE
+    //   - "local":
+    //     - most of the time, none of the potentially applicable flags are set
+    //     - sometimes: OFFLINE is set
+    // - OneDrive 23.076.0409.0001:
+    //   - "Available when online":
+    //     - RECALL_ON_DATA_ACCESS
+    //   - "Available on this device":
+    //     - none of the potentially applicable flags are set
+    //   - "Sync pending":
+    //     - REPARSE_POINT
+    // The flags tested as potentially applicable were:
+    // - REPARSE_POINT
+    // - RECALL_ON_DATA_ACCESS
+    // - RECALL_ON_OPEN
+    // - VIRTUAL
+    // - OFFLINE
+    //
+    // See also: https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants
+
+    const VIRTUAL_FILE_ATTRIBUTES: u32 =
+        FileSystem::FILE_ATTRIBUTE_REPARSE_POINT | FileSystem::FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS;
+
+    if (metadata.file_attributes() & VIRTUAL_FILE_ATTRIBUTES) == 0 {
+        metadata.file_size()
+    } else {
+        0
+    }
 }
 
 pub fn get_long_path<T: AsRef<U16CStr>>(str: T) -> Option<U16CString> {
